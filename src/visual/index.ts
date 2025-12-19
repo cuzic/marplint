@@ -2,6 +2,20 @@
  * Visual rules for marplint (Playwright-based)
  */
 
+// Base class and utilities
+export {
+  BaseVisualRule,
+  type BaseVisualConfig,
+  type VisualCheckResult,
+  detectInstalledBrowser,
+  buildMarpHtml,
+  launchBrowser,
+  setupPage,
+  cleanupTmpDir,
+  getMergedViewport
+} from './base-visual-rule.js';
+
+// Visual rules
 export { checkOverflow, type OverflowCheckerConfig, type OverflowResult } from './overflow-checker.js';
 export { checkWhitespace, type WhitespaceCheckerConfig, type WhitespaceResult } from './whitespace-checker.js';
 export { checkFontReadability, type FontReadabilityConfig, type FontReadabilityResult } from './font-readability.js';
