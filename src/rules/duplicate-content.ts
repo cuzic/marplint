@@ -4,6 +4,7 @@
  */
 
 import type { LintError } from './slide-line-count.js';
+import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface DuplicateContentConfig {
   enabled?: boolean;
@@ -78,68 +79,41 @@ export function duplicateContent(
 }
 
 function parseSlides(content: string): SlideContent[] {
-  const lines = content.split('\n');
   const slides: SlideContent[] = [];
-  let currentSlide = 1;
-  let slideStartLine = 1;
-  let inFrontmatter = false;
   let slideLines: string[] = [];
   let title = '';
+  let slideStartLine = 1;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
+  visitSlides(content, {
+    onSlideStart(slideNumber: number, startLine: number) {
+      slideLines = [];
+      title = '';
+      slideStartLine = startLine;
+    },
 
-    // Track frontmatter
-    if (line.trim() === '---') {
-      if (i === 0) {
-        inFrontmatter = true;
-        continue;
-      } else if (inFrontmatter) {
-        inFrontmatter = false;
-        continue;
-      } else {
-        // End of slide
-        if (slideLines.length > 0) {
-          const slideContent = slideLines.join('\n');
-          slides.push({
-            slideNumber: currentSlide,
-            startLine: slideStartLine,
-            title,
-            content: slideContent,
-            normalizedContent: normalizeContent(slideContent)
-          });
-        }
-
-        currentSlide++;
-        slideStartLine = i + 2;
-        slideLines = [];
-        title = '';
-        continue;
+    onSlideEnd(slideNumber: number) {
+      if (slideLines.length > 0) {
+        const slideContent = slideLines.join('\n');
+        slides.push({
+          slideNumber,
+          startLine: slideStartLine,
+          title,
+          content: slideContent,
+          normalizedContent: normalizeContent(slideContent)
+        });
       }
+    },
+
+    onHeading(_level: number, text: string, _context: LineContext) {
+      if (!title) {
+        title = text;
+      }
+    },
+
+    onLine(line: string, _context: LineContext) {
+      slideLines.push(line);
     }
-
-    if (inFrontmatter) continue;
-
-    // Extract title
-    const headingMatch = line.match(/^#+\s+(.+)$/);
-    if (headingMatch && !title) {
-      title = headingMatch[1] ?? '';
-    }
-
-    slideLines.push(line);
-  }
-
-  // Add last slide
-  if (slideLines.length > 0) {
-    const slideContent = slideLines.join('\n');
-    slides.push({
-      slideNumber: currentSlide,
-      startLine: slideStartLine,
-      title,
-      content: slideContent,
-      normalizedContent: normalizeContent(slideContent)
-    });
-  }
+  });
 
   return slides;
 }

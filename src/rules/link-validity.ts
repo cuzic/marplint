@@ -6,6 +6,7 @@
 import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import type { LintError } from './slide-line-count.js';
+import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface LinkValidityConfig {
   enabled?: boolean;
@@ -42,11 +43,7 @@ export function linkValidity(
     return [];
   }
 
-  const lines = content.split('\n');
   const errors: LintError[] = [];
-  let currentSlide = 1;
-  let inFrontmatter = false;
-  let inCodeBlock = false;
 
   // Regex patterns for links and images
   const linkPattern = /\[([^\]]*)\]\(([^)]+)\)/g;
@@ -54,95 +51,74 @@ export function linkValidity(
   const htmlImgPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
   const htmlLinkPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>/g;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const lineNumber = i + 1;
+  visitSlides(content, {
+    onLine(line: string, context: LineContext) {
+      const links: Link[] = [];
 
-    // Track frontmatter
-    if (line.trim() === '---') {
-      if (i === 0) {
-        inFrontmatter = true;
-        continue;
-      } else if (inFrontmatter) {
-        inFrontmatter = false;
-        continue;
-      } else {
-        currentSlide++;
-        continue;
+      // Markdown images
+      if (mergedConfig.checkImages) {
+        let match;
+        while ((match = imagePattern.exec(line)) !== null) {
+          links.push({
+            url: match[2] ?? '',
+            text: match[1] ?? '',
+            lineNumber: context.lineNumber,
+            slideNumber: context.slideNumber,
+            isImage: true
+          });
+        }
+        imagePattern.lastIndex = 0; // Reset regex state
       }
-    }
 
-    if (inFrontmatter) continue;
-
-    // Track code blocks
-    if (line.trim().startsWith('```')) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Extract links
-    const links: Link[] = [];
-
-    // Markdown images
-    if (mergedConfig.checkImages) {
+      // Markdown links
       let match;
-      while ((match = imagePattern.exec(line)) !== null) {
+      while ((match = linkPattern.exec(line)) !== null) {
+        // Skip if it's actually an image (starts with !)
+        const startIndex = match.index;
+        if (startIndex > 0 && line[startIndex - 1] === '!') continue;
+
         links.push({
           url: match[2] ?? '',
           text: match[1] ?? '',
-          lineNumber,
-          slideNumber: currentSlide,
-          isImage: true
+          lineNumber: context.lineNumber,
+          slideNumber: context.slideNumber,
+          isImage: false
         });
       }
-    }
+      linkPattern.lastIndex = 0; // Reset regex state
 
-    // Markdown links
-    let match;
-    while ((match = linkPattern.exec(line)) !== null) {
-      // Skip if it's actually an image (starts with !)
-      const startIndex = match.index;
-      if (startIndex > 0 && line[startIndex - 1] === '!') continue;
+      // HTML images
+      if (mergedConfig.checkImages) {
+        while ((match = htmlImgPattern.exec(line)) !== null) {
+          links.push({
+            url: match[1] ?? '',
+            text: '',
+            lineNumber: context.lineNumber,
+            slideNumber: context.slideNumber,
+            isImage: true
+          });
+        }
+        htmlImgPattern.lastIndex = 0; // Reset regex state
+      }
 
-      links.push({
-        url: match[2] ?? '',
-        text: match[1] ?? '',
-        lineNumber,
-        slideNumber: currentSlide,
-        isImage: false
-      });
-    }
-
-    // HTML images
-    if (mergedConfig.checkImages) {
-      while ((match = htmlImgPattern.exec(line)) !== null) {
+      // HTML links
+      while ((match = htmlLinkPattern.exec(line)) !== null) {
         links.push({
           url: match[1] ?? '',
           text: '',
-          lineNumber,
-          slideNumber: currentSlide,
-          isImage: true
+          lineNumber: context.lineNumber,
+          slideNumber: context.slideNumber,
+          isImage: false
         });
       }
-    }
+      htmlLinkPattern.lastIndex = 0; // Reset regex state
 
-    // HTML links
-    while ((match = htmlLinkPattern.exec(line)) !== null) {
-      links.push({
-        url: match[1] ?? '',
-        text: '',
-        lineNumber,
-        slideNumber: currentSlide,
-        isImage: false
-      });
+      // Validate each link
+      for (const link of links) {
+        validateLink(link, filePath, errors, mergedConfig);
+      }
     }
-
-    // Validate each link
-    for (const link of links) {
-      validateLink(link, filePath, errors, mergedConfig);
-    }
-  }
+  });
 
   return errors;
 }

@@ -4,6 +4,7 @@
  */
 
 import type { LintError } from './slide-line-count.js';
+import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface HeadingHierarchyConfig {
   enabled?: boolean;
@@ -32,55 +33,29 @@ export function headingHierarchy(
     return [];
   }
 
-  const lines = content.split('\n');
   const errors: LintError[] = [];
-  let currentSlide = 1;
-  let inFrontmatter = false;
-  let inCodeBlock = false;
+  let headingsInSlide: Heading[] = [];
+  let currentSlide = 0;
 
-  const headingsInSlide: Heading[] = [];
+  visitSlides(content, {
+    onSlideStart(slideNumber: number) {
+      currentSlide = slideNumber;
+      headingsInSlide = [];
+    },
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const lineNumber = i + 1;
+    onSlideEnd(slideNumber: number) {
+      validateSlideHeadings(headingsInSlide, errors, slideNumber, mergedConfig);
+    },
 
-    // Track frontmatter
-    if (line.trim() === '---') {
-      if (i === 0) {
-        inFrontmatter = true;
-        continue;
-      } else if (inFrontmatter) {
-        inFrontmatter = false;
-        continue;
-      } else {
-        // Slide break - validate headings in previous slide
-        validateSlideHeadings(headingsInSlide, errors, currentSlide, mergedConfig);
-        headingsInSlide.length = 0;
-        currentSlide++;
-        continue;
-      }
+    onHeading(level: number, text: string, context: LineContext) {
+      headingsInSlide.push({
+        level,
+        lineNumber: context.lineNumber,
+        text,
+        slideNumber: context.slideNumber
+      });
     }
-
-    if (inFrontmatter) continue;
-
-    // Track code blocks
-    if (line.trim().startsWith('```')) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Detect headings
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      const level = headingMatch[1]?.length ?? 0;
-      const text = headingMatch[2] ?? '';
-      headingsInSlide.push({ level, lineNumber, text, slideNumber: currentSlide });
-    }
-  }
-
-  // Validate last slide
-  validateSlideHeadings(headingsInSlide, errors, currentSlide, mergedConfig);
+  });
 
   return errors;
 }
