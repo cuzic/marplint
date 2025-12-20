@@ -30,6 +30,7 @@ interface LintResult {
   errors: LintError[];
   warnings: LintError[];
   fixes?: FixResult[];
+  visualError?: string;
 }
 
 interface FormattedOutput {
@@ -38,6 +39,7 @@ interface FormattedOutput {
     slides: number;
     errors: number;
     warnings: number;
+    visualErrors: number;
     fixed?: number;
   };
   results: LintResult[];
@@ -134,6 +136,7 @@ async function runLinter(
     const errors: LintError[] = [];
     const warnings: LintError[] = [];
     let fixes: FixResult[] = [];
+    let visualError: string | undefined;
 
     // Run static rules
     if (runStatic) {
@@ -149,12 +152,9 @@ async function runLinter(
         errors.push(...visualResult.errors);
         warnings.push(...visualResult.warnings);
       } catch (error) {
+        visualError = error instanceof Error ? error.message : String(error);
         if (options.format === 'text') {
-          console.warn(
-            chalk.yellow(
-              `  ⚠️  Visual check failed for ${basename(file)}: ${error instanceof Error ? error.message : error}`
-            )
-          );
+          console.warn(chalk.yellow(`  ⚠️  Visual check failed for ${basename(file)}: ${visualError}`));
         }
       }
     }
@@ -191,7 +191,8 @@ async function runLinter(
       slideCount,
       errors: filteredErrors,
       warnings: filteredWarnings,
-      fixes: fixes.length > 0 ? fixes : undefined
+      fixes: fixes.length > 0 ? fixes : undefined,
+      visualError
     });
 
     // Output progress for text format
@@ -328,6 +329,7 @@ function formatOutput(results: LintResult[], totalFixed?: number): FormattedOutp
     slides: results.reduce((sum, r) => sum + r.slideCount, 0),
     errors: results.reduce((sum, r) => sum + r.errors.length, 0),
     warnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
+    visualErrors: results.filter((r) => r.visualError !== undefined).length,
     fixed: totalFixed
   };
 
@@ -346,15 +348,20 @@ function outputSummary(summary: FormattedOutput['summary'], _fix?: boolean, fixD
   if (summary.warnings > 0) {
     console.log(chalk.yellow(`Warnings: ${summary.warnings}`));
   }
+  if (summary.visualErrors > 0) {
+    console.log(chalk.yellow(`Visual check failures: ${summary.visualErrors}`));
+  }
   if (summary.fixed && summary.fixed > 0) {
     const fixLabel = fixDryRun ? 'Would fix' : 'Fixed';
     console.log(chalk.magenta(`${fixLabel}: ${summary.fixed}`));
   }
 
-  if (summary.errors === 0) {
+  if (summary.errors === 0 && summary.visualErrors === 0) {
     console.log(chalk.green.bold('\n✨ All checks passed!\n'));
-  } else {
+  } else if (summary.errors > 0) {
     console.log(chalk.red.bold(`\n❌ ${summary.errors} error(s) found\n`));
+  } else {
+    console.log(chalk.yellow.bold(`\n⚠️  Visual checks failed for ${summary.visualErrors} file(s)\n`));
   }
 }
 
@@ -362,8 +369,8 @@ function generateHtmlReport(output: FormattedOutput): string {
   const { summary, results } = output;
 
   const errorRows = results
-    .flatMap((r) =>
-      [...r.errors, ...r.warnings].map(
+    .flatMap((r) => {
+      const rows = [...r.errors, ...r.warnings].map(
         (e) => `
       <tr class="${e.severity}">
         <td>${basename(r.file)}</td>
@@ -373,8 +380,20 @@ function generateHtmlReport(output: FormattedOutput): string {
         <td>${e.severity}</td>
       </tr>
     `
-      )
-    )
+      );
+      if (r.visualError) {
+        rows.push(`
+      <tr class="warning">
+        <td>${basename(r.file)}</td>
+        <td>-</td>
+        <td>visual-check</td>
+        <td>Visual check failed: ${r.visualError}</td>
+        <td>visual-error</td>
+      </tr>
+    `);
+      }
+      return rows;
+    })
     .join('');
 
   return `<!DOCTYPE html>
@@ -418,6 +437,10 @@ function generateHtmlReport(output: FormattedOutput): string {
     <div class="stat warnings">
       <div class="stat-value">${summary.warnings}</div>
       <div class="stat-label">Warnings</div>
+    </div>
+    <div class="stat warnings">
+      <div class="stat-value">${summary.visualErrors}</div>
+      <div class="stat-label">Visual Errors</div>
     </div>
   </div>
 
