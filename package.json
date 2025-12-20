@@ -16,6 +16,7 @@
     "check:fix": "biome check ./src ./tests --write",
     "format": "biome format ./src ./tests --write",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "validate": "bun run typecheck && bun run check && bun run test run"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "@biomejs/biome": "^2.3.10",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.0.16",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^4.0.16"
