@@ -3,6 +3,15 @@
  */
 
 import { parseSlides, countContentLines, countCharacters, countListItems } from '../utils/slide-parser.js';
+import {
+  extractHeadings,
+  checkHeadingHierarchy,
+  extractLinks,
+  checkLinkTextQuality,
+  extractImages,
+  checkImageAltText,
+  hasTableHeader
+} from '../utils/accessibility-checks.js';
 
 export interface SlideAnalysis {
   slideNumber: number;
@@ -181,72 +190,59 @@ function estimateReadingTime(slide: ReturnType<typeof parseSlides>['slides'][0])
 
 /**
  * Check accessibility issues
+ * Uses shared validation functions from accessibility-checks.ts
  */
 function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]): AccessibilityScore {
   const content = slide.lines.join('\n');
   const issues: AccessibilityIssue[] = [];
   const passedChecks: string[] = [];
 
-  // Check 1: Images have alt text
-  const images = content.match(/!\[([^\]]*)\]\([^)]+\)/g) || [];
-  for (const img of images) {
-    const altMatch = img.match(/!\[([^\]]*)\]/);
-    const altText = altMatch?.[1] ?? '';
-    if (!altText.trim()) {
-      issues.push({
-        type: 'image-alt',
-        message: 'Image missing alt text',
-        severity: 'serious'
-      });
-    }
+  // Check 1: Images have alt text (using shared function)
+  const images = extractImages(content);
+  const altIssues = checkImageAltText(images);
+  for (const issue of altIssues) {
+    issues.push({
+      type: 'image-alt',
+      message: 'Image missing alt text',
+      severity: 'serious'
+    });
   }
-  if (images.length > 0 && !issues.some(i => i.type === 'image-alt')) {
+  if (images.length > 0 && altIssues.length === 0) {
     passedChecks.push('All images have alt text');
   }
 
-  // Check 2: Proper heading hierarchy
-  const headings = content.match(/^#+/gm) || [];
-  let hasProperHierarchy = true;
-  let prevLevel = 0;
-  for (const heading of headings) {
-    const level = heading.length;
-    if (prevLevel > 0 && level > prevLevel + 1) {
-      hasProperHierarchy = false;
-      issues.push({
-        type: 'heading-hierarchy',
-        message: `Heading level jumped from H${prevLevel} to H${level}`,
-        severity: 'moderate'
-      });
-      break;
-    }
-    prevLevel = level;
+  // Check 2: Proper heading hierarchy (using shared function)
+  const headings = extractHeadings(content);
+  const hierarchyIssues = checkHeadingHierarchy(headings);
+  for (const issue of hierarchyIssues) {
+    issues.push({
+      type: 'heading-hierarchy',
+      message: `Heading level jumped from H${issue.fromLevel} to H${issue.toLevel}`,
+      severity: 'moderate'
+    });
   }
-  if (hasProperHierarchy && headings.length > 0) {
+  if (headings.length > 0 && hierarchyIssues.length === 0) {
     passedChecks.push('Proper heading hierarchy');
   }
 
-  // Check 3: Links have descriptive text
-  const links = content.match(/\[([^\]]*)\]\([^)]+\)/g) || [];
-  for (const link of links) {
-    const textMatch = link.match(/\[([^\]]*)\]/);
-    const text = textMatch?.[1] ?? '';
-    if (text.length < 3 || ['here', 'click', 'link'].includes(text.toLowerCase())) {
-      issues.push({
-        type: 'link-text',
-        message: `Link text "${text}" is not descriptive`,
-        severity: 'moderate'
-      });
-    }
+  // Check 3: Links have descriptive text (using shared function)
+  const links = extractLinks(content);
+  const linkIssues = checkLinkTextQuality(links);
+  for (const issue of linkIssues) {
+    issues.push({
+      type: 'link-text',
+      message: `Link text "${issue.text}" is not descriptive`,
+      severity: 'moderate'
+    });
   }
-  if (links.length > 0 && !issues.some(i => i.type === 'link-text')) {
+  if (links.length > 0 && linkIssues.length === 0) {
     passedChecks.push('Links have descriptive text');
   }
 
-  // Check 4: Table has header
-  const tables = content.match(/^\|[^|]+\|/gm) || [];
-  if (tables.length > 0) {
-    const hasSeparator = content.includes('|---|') || content.includes('| --- |');
-    if (!hasSeparator) {
+  // Check 4: Table has header (using shared function)
+  const hasTables = content.match(/^\|[^|]+\|/gm) || [];
+  if (hasTables.length > 0) {
+    if (!hasTableHeader(content)) {
       issues.push({
         type: 'table-header',
         message: 'Table may be missing header row',
