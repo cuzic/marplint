@@ -2,16 +2,16 @@
  * Advanced analysis features for marplint
  */
 
-import { parseSlides, countContentLines, countCharacters, countListItems } from '../utils/slide-parser.js';
 import {
-  extractHeadings,
   checkHeadingHierarchy,
-  extractLinks,
-  checkLinkTextQuality,
-  extractImages,
   checkImageAltText,
+  checkLinkTextQuality,
+  extractHeadings,
+  extractImages,
+  extractLinks,
   hasTableHeader
 } from '../utils/accessibility-checks.js';
+import { countCharacters, countContentLines, countListItems, parseSlides } from '../utils/slide-parser.js';
 
 export interface SlideAnalysis {
   slideNumber: number;
@@ -171,7 +171,7 @@ function estimateReadingTime(slide: ReturnType<typeof parseSlides>['slides'][0])
   const codeBlocks = (slide.lines.join('\n').match(/```/g) || []).length / 2;
   const tables = (slide.lines.join('\n').match(/^\|/gm) || []).length;
 
-  const visualTime = (images * 0.25) + (codeBlocks * 0.5) + (tables * 0.1);
+  const visualTime = images * 0.25 + codeBlocks * 0.5 + tables * 0.1;
 
   const totalMinutes = japaneseTime + englishTime + visualTime;
   const seconds = Math.round(totalMinutes * 60);
@@ -200,7 +200,7 @@ function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]):
   // Check 1: Images have alt text (using shared function)
   const images = extractImages(content);
   const altIssues = checkImageAltText(images);
-  for (const issue of altIssues) {
+  for (const _issue of altIssues) {
     issues.push({
       type: 'image-alt',
       message: 'Image missing alt text',
@@ -288,41 +288,37 @@ function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]):
 function generateSummary(slides: SlideAnalysis[]): DocumentAnalysis['summary'] {
   const totalSlides = slides.length;
 
-  const avgComplexity = Math.round(
-    slides.reduce((sum, s) => sum + s.complexity.score, 0) / totalSlides
-  );
+  const avgComplexity = Math.round(slides.reduce((sum, s) => sum + s.complexity.score, 0) / totalSlides);
 
   const totalSeconds = slides.reduce((sum, s) => sum + s.readingTime.seconds, 0);
   const totalMins = Math.floor(totalSeconds / 60);
   const totalSecs = totalSeconds % 60;
 
-  const avgAccessibility = Math.round(
-    slides.reduce((sum, s) => sum + s.accessibility.score, 0) / totalSlides
-  );
+  const avgAccessibility = Math.round(slides.reduce((sum, s) => sum + s.accessibility.score, 0) / totalSlides);
 
   const recommendations: string[] = [];
 
   // Complexity recommendations
-  const complexSlides = slides.filter(s => s.complexity.level === 'very-complex');
+  const complexSlides = slides.filter((s) => s.complexity.level === 'very-complex');
   if (complexSlides.length > 0) {
     recommendations.push(
-      `${complexSlides.length} slides are very complex. Consider simplifying slides ${complexSlides.map(s => s.slideNumber).join(', ')}.`
+      `${complexSlides.length} slides are very complex. Consider simplifying slides ${complexSlides.map((s) => s.slideNumber).join(', ')}.`
     );
   }
 
   // Reading time recommendations
-  const longSlides = slides.filter(s => s.readingTime.seconds > 120);
+  const longSlides = slides.filter((s) => s.readingTime.seconds > 120);
   if (longSlides.length > 0) {
     recommendations.push(
-      `${longSlides.length} slides may take >2 minutes to present. Consider splitting slides ${longSlides.map(s => s.slideNumber).join(', ')}.`
+      `${longSlides.length} slides may take >2 minutes to present. Consider splitting slides ${longSlides.map((s) => s.slideNumber).join(', ')}.`
     );
   }
 
   // Accessibility recommendations
-  const lowAccessibility = slides.filter(s => s.accessibility.score < 70);
+  const lowAccessibility = slides.filter((s) => s.accessibility.score < 70);
   if (lowAccessibility.length > 0) {
     recommendations.push(
-      `${lowAccessibility.length} slides have accessibility issues. Review slides ${lowAccessibility.map(s => s.slideNumber).join(', ')}.`
+      `${lowAccessibility.length} slides have accessibility issues. Review slides ${lowAccessibility.map((s) => s.slideNumber).join(', ')}.`
     );
   }
 
@@ -375,7 +371,7 @@ Slide ${slide.slideNumber}:
   Complexity: ${slide.complexity.score}/100 (${slide.complexity.level})
   Reading Time: ${slide.readingTime.formatted}
   Accessibility: ${slide.accessibility.score}/100
-  ${slide.accessibility.issues.length > 0 ? `Issues: ${slide.accessibility.issues.map(i => i.message).join(', ')}` : 'No accessibility issues'}
+  ${slide.accessibility.issues.length > 0 ? `Issues: ${slide.accessibility.issues.map((i) => i.message).join(', ')}` : 'No accessibility issues'}
 `;
   }
 

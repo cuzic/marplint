@@ -2,8 +2,8 @@
  * Configuration management for marplint
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 export interface RuleConfig {
   enabled?: boolean;
@@ -73,11 +73,7 @@ const DEFAULT_CONFIG: MarplintConfig = {
   }
 };
 
-const CONFIG_FILENAMES = [
-  '.marplintrc.json',
-  '.marplintrc',
-  'marplint.config.json'
-];
+const CONFIG_FILENAMES = ['.marplintrc.json', '.marplintrc', 'marplint.config.json'];
 
 /**
  * Find and load configuration file
@@ -109,10 +105,7 @@ export function loadConfig(startDir?: string): MarplintConfig {
 /**
  * Merge user config with default config
  */
-function mergeConfig(
-  defaultConfig: MarplintConfig,
-  userConfig: Partial<MarplintConfig>
-): MarplintConfig {
+function mergeConfig(defaultConfig: MarplintConfig, userConfig: Partial<MarplintConfig>): MarplintConfig {
   return {
     rules: {
       ...defaultConfig.rules,
@@ -128,10 +121,7 @@ function mergeConfig(
 /**
  * Check if a rule is enabled
  */
-export function isRuleEnabled(
-  config: MarplintConfig,
-  ruleName: keyof MarplintConfig['rules']
-): boolean {
+export function isRuleEnabled(config: MarplintConfig, ruleName: keyof MarplintConfig['rules']): boolean {
   const ruleConfig = config.rules[ruleName];
   if (typeof ruleConfig === 'boolean') {
     return ruleConfig;

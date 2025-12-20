@@ -3,12 +3,11 @@
  * Eliminates code duplication across visual rule checkers
  */
 
-import { chromium, type Browser, type Page } from 'playwright';
-import { execSync } from 'child_process';
-import { existsSync } from 'fs';
-import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
-import { join, resolve } from 'path';
+import { execSync } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { type Browser, chromium, type Page } from 'playwright';
 import type { LintError } from '../rules/slide-line-count.js';
 
 export interface BaseVisualConfig {
@@ -41,7 +40,7 @@ export function detectInstalledBrowser(): string | null {
     '/opt/google/chrome/chrome',
     '/usr/bin/microsoft-edge',
     '/usr/bin/microsoft-edge-stable',
-    '/snap/bin/chromium',
+    '/snap/bin/chromium'
   ];
 
   for (const browserPath of browserPaths) {
@@ -55,9 +54,7 @@ export function detectInstalledBrowser(): string | null {
     try {
       const result = execSync(`which ${cmd}`, { encoding: 'utf-8' }).trim();
       if (result) return result;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return null;
@@ -66,7 +63,10 @@ export function detectInstalledBrowser(): string | null {
 /**
  * Build Marp HTML from markdown file
  */
-export async function buildMarpHtml(markdownPath: string, tmpPrefix: string): Promise<{ htmlContent: string; tmpDir: string }> {
+export async function buildMarpHtml(
+  markdownPath: string,
+  tmpPrefix: string
+): Promise<{ htmlContent: string; tmpDir: string }> {
   const tmpDir = await fs.mkdtemp(join(tmpdir(), `marplint-${tmpPrefix}-`));
   const tmpHtmlPath = join(tmpDir, 'output.html');
 
@@ -137,10 +137,7 @@ export abstract class BaseVisualRule<TConfig extends BaseVisualConfig, TResult> 
   /**
    * Template method: orchestrates the visual check process
    */
-  async check(
-    markdownPath: string,
-    config: TConfig = {} as TConfig
-  ): Promise<VisualCheckResult<TResult>> {
+  async check(markdownPath: string, config: TConfig = {} as TConfig): Promise<VisualCheckResult<TResult>> {
     const mergedConfig = this.mergeConfig(config);
 
     if (!mergedConfig.enabled) {

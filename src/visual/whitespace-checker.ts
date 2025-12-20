@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface WhitespaceCheckerConfig extends BaseVisualConfig {
   minUtilization?: number; // Minimum content utilization (0.0 - 1.0)
@@ -35,7 +35,7 @@ class WhitespaceCheckerRule extends BaseVisualRule<WhitespaceCheckerConfig, Whit
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page): Promise<WhitespaceResult[]> {
-    return await page.evaluate(() => {
+    return (await page.evaluate(() => {
       const sections = Array.from(document.querySelectorAll('section'));
       return sections.map((section, index) => {
         const scrollHeight = section.scrollHeight;
@@ -56,7 +56,7 @@ class WhitespaceCheckerRule extends BaseVisualRule<WhitespaceCheckerConfig, Whit
           dataClass: dataClass || undefined
         };
       });
-    }) as WhitespaceResult[];
+    })) as WhitespaceResult[];
   }
 
   protected convertToErrors(results: WhitespaceResult[], config: Required<WhitespaceCheckerConfig>): LintError[] {

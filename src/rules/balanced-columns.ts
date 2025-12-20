@@ -3,7 +3,7 @@
  * Checks if 2-column layouts are balanced
  */
 
-import { parseSlides, findColumns } from '../utils/slide-parser.js';
+import { findColumns, parseSlides } from '../utils/slide-parser.js';
 import type { LintError } from './slide-line-count.js';
 
 export interface BalancedColumnsConfig {
@@ -18,10 +18,7 @@ const DEFAULT_CONFIG: Required<BalancedColumnsConfig> = {
   minColumnLines: 3
 };
 
-export function balancedColumns(
-  content: string,
-  config: BalancedColumnsConfig = {}
-): LintError[] {
+export function balancedColumns(content: string, config: BalancedColumnsConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -33,8 +30,8 @@ export function balancedColumns(
 
   for (const slide of slides) {
     // Check if slide has columns
-    const hasColumnsDiv = slide.lines.some(line =>
-      line.includes('class="columns"') || line.includes("class='columns'")
+    const hasColumnsDiv = slide.lines.some(
+      (line) => line.includes('class="columns"') || line.includes("class='columns'")
     );
 
     if (!hasColumnsDiv) continue;

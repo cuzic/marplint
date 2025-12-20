@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface ColorContrastConfig extends BaseVisualConfig {
   minContrastRatio?: number; // WCAG AA requires 4.5:1 for normal text
@@ -38,85 +38,88 @@ class ColorContrastRule extends BaseVisualRule<ColorContrastConfig, ColorContras
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page, config: Required<ColorContrastConfig>): Promise<ColorContrastResult[]> {
-    return await page.evaluate((cfg: { minRatio: number; minRatioLarge: number }) => {
-      // Helper functions for color contrast calculation
-      function parseColor(colorStr: string): { r: number; g: number; b: number; a: number } | null {
-        const rgbMatch = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-        if (rgbMatch) {
-          return {
-            r: parseInt(rgbMatch[1] ?? '0'),
-            g: parseInt(rgbMatch[2] ?? '0'),
-            b: parseInt(rgbMatch[3] ?? '0'),
-            a: parseFloat(rgbMatch[4] ?? '1')
-          };
-        }
-        return null;
-      }
-
-      function getLuminance(r: number, g: number, b: number): number {
-        const [rs, gs, bs] = [r, g, b].map(c => {
-          c = c / 255;
-          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * (rs ?? 0) + 0.7152 * (gs ?? 0) + 0.0722 * (bs ?? 0);
-      }
-
-      function getContrastRatio(l1: number, l2: number): number {
-        const lighter = Math.max(l1, l2);
-        const darker = Math.min(l1, l2);
-        return (lighter + 0.05) / (darker + 0.05);
-      }
-
-      const sections = Array.from(document.querySelectorAll('section'));
-
-      return sections.map((section, index) => {
-        const lowContrastElements: Array<{
-          text: string;
-          foreground: string;
-          background: string;
-          ratio: number;
-          fontSize: number;
-        }> = [];
-
-        const textElements = section.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, span, td, th');
-
-        textElements.forEach((el) => {
-          const style = window.getComputedStyle(el);
-          const text = (el as HTMLElement).innerText?.trim().substring(0, 30) || '';
-          if (!text) return;
-
-          const foreground = style.color;
-          const background = style.backgroundColor;
-          const fontSize = parseFloat(style.fontSize);
-
-          const fgColor = parseColor(foreground);
-          const bgColor = parseColor(background);
-
-          if (fgColor && bgColor && bgColor.a > 0) {
-            const fgLum = getLuminance(fgColor.r, fgColor.g, fgColor.b);
-            const bgLum = getLuminance(bgColor.r, bgColor.g, bgColor.b);
-            const ratio = getContrastRatio(fgLum, bgLum);
-
-            const requiredRatio = fontSize >= 18 ? cfg.minRatioLarge : cfg.minRatio;
-
-            if (ratio < requiredRatio) {
-              lowContrastElements.push({
-                text,
-                foreground,
-                background,
-                ratio: Math.round(ratio * 100) / 100,
-                fontSize: Math.round(fontSize)
-              });
-            }
+    return (await page.evaluate(
+      (cfg: { minRatio: number; minRatioLarge: number }) => {
+        // Helper functions for color contrast calculation
+        function parseColor(colorStr: string): { r: number; g: number; b: number; a: number } | null {
+          const rgbMatch = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+          if (rgbMatch) {
+            return {
+              r: parseInt(rgbMatch[1] ?? '0', 10),
+              g: parseInt(rgbMatch[2] ?? '0', 10),
+              b: parseInt(rgbMatch[3] ?? '0', 10),
+              a: parseFloat(rgbMatch[4] ?? '1')
+            };
           }
-        });
+          return null;
+        }
 
-        return {
-          slideNumber: index + 1,
-          lowContrastElements: lowContrastElements.slice(0, 3)
-        };
-      });
-    }, { minRatio: config.minContrastRatio, minRatioLarge: config.minContrastRatioLarge }) as ColorContrastResult[];
+        function getLuminance(r: number, g: number, b: number): number {
+          const [rs, gs, bs] = [r, g, b].map((c) => {
+            c = c / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * (rs ?? 0) + 0.7152 * (gs ?? 0) + 0.0722 * (bs ?? 0);
+        }
+
+        function getContrastRatio(l1: number, l2: number): number {
+          const lighter = Math.max(l1, l2);
+          const darker = Math.min(l1, l2);
+          return (lighter + 0.05) / (darker + 0.05);
+        }
+
+        const sections = Array.from(document.querySelectorAll('section'));
+
+        return sections.map((section, index) => {
+          const lowContrastElements: Array<{
+            text: string;
+            foreground: string;
+            background: string;
+            ratio: number;
+            fontSize: number;
+          }> = [];
+
+          const textElements = section.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, span, td, th');
+
+          textElements.forEach((el) => {
+            const style = window.getComputedStyle(el);
+            const text = (el as HTMLElement).innerText?.trim().substring(0, 30) || '';
+            if (!text) return;
+
+            const foreground = style.color;
+            const background = style.backgroundColor;
+            const fontSize = parseFloat(style.fontSize);
+
+            const fgColor = parseColor(foreground);
+            const bgColor = parseColor(background);
+
+            if (fgColor && bgColor && bgColor.a > 0) {
+              const fgLum = getLuminance(fgColor.r, fgColor.g, fgColor.b);
+              const bgLum = getLuminance(bgColor.r, bgColor.g, bgColor.b);
+              const ratio = getContrastRatio(fgLum, bgLum);
+
+              const requiredRatio = fontSize >= 18 ? cfg.minRatioLarge : cfg.minRatio;
+
+              if (ratio < requiredRatio) {
+                lowContrastElements.push({
+                  text,
+                  foreground,
+                  background,
+                  ratio: Math.round(ratio * 100) / 100,
+                  fontSize: Math.round(fontSize)
+                });
+              }
+            }
+          });
+
+          return {
+            slideNumber: index + 1,
+            lowContrastElements: lowContrastElements.slice(0, 3)
+          };
+        });
+      },
+      { minRatio: config.minContrastRatio, minRatioLarge: config.minContrastRatioLarge }
+    )) as ColorContrastResult[];
   }
 
   protected convertToErrors(results: ColorContrastResult[]): LintError[] {

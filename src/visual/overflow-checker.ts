@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface OverflowCheckerConfig extends BaseVisualConfig {
   threshold?: number; // Minimum overflow in pixels to report
@@ -38,7 +38,7 @@ class OverflowCheckerRule extends BaseVisualRule<OverflowCheckerConfig, Overflow
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page): Promise<OverflowResult[]> {
-    return await page.evaluate(() => {
+    return (await page.evaluate(() => {
       const sections = Array.from(document.querySelectorAll('section'));
       return sections.map((section, index): OverflowResult => {
         const scrollHeight = section.scrollHeight;
@@ -64,7 +64,7 @@ class OverflowCheckerRule extends BaseVisualRule<OverflowCheckerConfig, Overflow
           dataClass: dataClass || undefined
         };
       });
-    }) as OverflowResult[];
+    })) as OverflowResult[];
   }
 
   protected convertToErrors(results: OverflowResult[], config: Required<OverflowCheckerConfig>): LintError[] {

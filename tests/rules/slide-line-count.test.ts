@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { slideLineCount } from '../../src/rules/slide-line-count.js';
 
 describe('slide-line-count', () => {
@@ -54,7 +54,7 @@ marp: true
 One line only
 `;
     const errors = slideLineCount(content);
-    const fewLineErrors = errors.filter(e => e.message.includes('only'));
+    const fewLineErrors = errors.filter((e) => e.message.includes('only'));
     expect(fewLineErrors.length).toBeGreaterThan(0);
     expect(fewLineErrors[0]?.severity).toBe('warning');
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { headingHierarchy } from '../../src/rules/heading-hierarchy.js';
 
 describe('heading-hierarchy', () => {
@@ -56,7 +56,7 @@ marp: true
 # Another H1 in second slide
 `;
     const errors = headingHierarchy(content, { allowH1InSlides: false });
-    const h1Errors = errors.filter(e => e.message.includes('H1 should only'));
+    const h1Errors = errors.filter((e) => e.message.includes('H1 should only'));
     expect(h1Errors.length).toBeGreaterThan(0);
   });
 
@@ -72,7 +72,7 @@ marp: true
 # Another H1 in second slide
 `;
     const errors = headingHierarchy(content, { allowH1InSlides: true });
-    const h1Errors = errors.filter(e => e.message.includes('H1 should only'));
+    const h1Errors = errors.filter((e) => e.message.includes('H1 should only'));
     expect(h1Errors).toHaveLength(0);
   });
 

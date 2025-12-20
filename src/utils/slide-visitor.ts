@@ -149,12 +149,7 @@ export function visitSlides(content: string, visitor: SlideVisitor): void {
       } else {
         // End of code block
         if (visitor.onCodeBlockEnd) {
-          visitor.onCodeBlockEnd(
-            codeBlockLines,
-            codeBlockLanguage,
-            codeBlockStartLine,
-            getContext(lineNumber)
-          );
+          visitor.onCodeBlockEnd(codeBlockLines, codeBlockLanguage, codeBlockStartLine, getContext(lineNumber));
         }
         inCodeBlock = false;
         codeBlockLanguage = '';

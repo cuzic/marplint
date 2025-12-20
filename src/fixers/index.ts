@@ -21,7 +21,10 @@ export interface FixerContext {
 /**
  * Apply all available fixes to content
  */
-export function applyFixes(content: string, errors: LintError[]): {
+export function applyFixes(
+  content: string,
+  errors: LintError[]
+): {
   fixedContent: string;
   results: FixResult[];
 } {
@@ -43,7 +46,7 @@ export function applyFixes(content: string, errors: LintError[]): {
   }> = [
     { ruleId: 'marp/html-blank-lines', fix: fixHtmlBlankLines },
     { ruleId: 'marp/missing-font-class', fix: fixMissingFontClass },
-    { ruleId: 'marp/heading-hierarchy', fix: fixHeadingHierarchy },
+    { ruleId: 'marp/heading-hierarchy', fix: fixHeadingHierarchy }
   ];
 
   for (const fixer of fixers) {
@@ -61,7 +64,10 @@ export function applyFixes(content: string, errors: LintError[]): {
 /**
  * Fix: Add blank lines around HTML tags
  */
-function fixHtmlBlankLines(content: string, errors: LintError[]): {
+function fixHtmlBlankLines(
+  content: string,
+  errors: LintError[]
+): {
   content: string;
   results: FixResult[];
 } {
@@ -71,7 +77,7 @@ function fixHtmlBlankLines(content: string, errors: LintError[]): {
 
   for (const error of errors) {
     const lineIndex = error.lineNumber - 1;
-    const line = lines[lineIndex] ?? '';
+    const _line = lines[lineIndex] ?? '';
     const prevLine = lines[lineIndex - 1] ?? '';
     const nextLine = lines[lineIndex + 1] ?? '';
 
@@ -110,7 +116,10 @@ function fixHtmlBlankLines(content: string, errors: LintError[]): {
 /**
  * Fix: Add font-class directive to dense slides
  */
-function fixMissingFontClass(content: string, errors: LintError[]): {
+function fixMissingFontClass(
+  content: string,
+  errors: LintError[]
+): {
   content: string;
   results: FixResult[];
 } {
@@ -194,7 +203,10 @@ function fixMissingFontClass(content: string, errors: LintError[]): {
 /**
  * Fix: Convert H1 to H2 in non-title slides
  */
-function fixHeadingHierarchy(content: string, errors: LintError[]): {
+function fixHeadingHierarchy(
+  content: string,
+  errors: LintError[]
+): {
   content: string;
   results: FixResult[];
 } {
@@ -206,7 +218,7 @@ function fixHeadingHierarchy(content: string, errors: LintError[]): {
       const lineIndex = error.lineNumber - 1;
       const line = lines[lineIndex] ?? '';
       if (line.startsWith('# ')) {
-        lines[lineIndex] = '#' + line; // Convert # to ##
+        lines[lineIndex] = `#${line}`; // Convert # to ##
         results.push({
           ruleId: 'marp/heading-hierarchy',
           slideNumber: error.slideNumber,
@@ -225,9 +237,5 @@ function fixHeadingHierarchy(content: string, errors: LintError[]): {
  * Get list of fixable rule IDs
  */
 export function getFixableRules(): string[] {
-  return [
-    'marp/html-blank-lines',
-    'marp/missing-font-class',
-    'marp/heading-hierarchy'
-  ];
+  return ['marp/html-blank-lines', 'marp/missing-font-class', 'marp/heading-hierarchy'];
 }

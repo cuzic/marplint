@@ -3,8 +3,8 @@
  * Checks code block length to prevent overflow
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface CodeBlockLengthConfig {
   enabled?: boolean;
@@ -18,10 +18,7 @@ const DEFAULT_CONFIG: Required<CodeBlockLengthConfig> = {
   maxLineLength: 80
 };
 
-export function codeBlockLength(
-  content: string,
-  config: CodeBlockLengthConfig = {}
-): LintError[] {
+export function codeBlockLength(content: string, config: CodeBlockLengthConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -31,7 +28,7 @@ export function codeBlockLength(
   const errors: LintError[] = [];
 
   visitSlides(content, {
-    onCodeBlockEnd(lines: string[], language: string, startLine: number, context: LineContext) {
+    onCodeBlockEnd(lines: string[], _language: string, startLine: number, context: LineContext) {
       // Check line count
       if (lines.length > mergedConfig.maxLines) {
         errors.push({

@@ -3,8 +3,8 @@
  * Detects duplicate or very similar slides
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface DuplicateContentConfig {
   enabled?: boolean;
@@ -28,10 +28,7 @@ interface SlideContent {
   normalizedContent: string;
 }
 
-export function duplicateContent(
-  content: string,
-  config: DuplicateContentConfig = {}
-): LintError[] {
+export function duplicateContent(content: string, config: DuplicateContentConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -54,10 +51,7 @@ export function duplicateContent(
         continue;
       }
 
-      const similarity = calculateSimilarity(
-        slideA.normalizedContent,
-        slideB.normalizedContent
-      );
+      const similarity = calculateSimilarity(slideA.normalizedContent, slideB.normalizedContent);
 
       if (similarity >= mergedConfig.similarityThreshold) {
         const pairKey = `${slideA.slideNumber}-${slideB.slideNumber}`;
@@ -85,7 +79,7 @@ function parseSlides(content: string): SlideContent[] {
   let slideStartLine = 1;
 
   visitSlides(content, {
-    onSlideStart(slideNumber: number, startLine: number) {
+    onSlideStart(_slideNumber: number, startLine: number) {
       slideLines = [];
       title = '';
       slideStartLine = startLine;
@@ -136,7 +130,7 @@ function calculateSimilarity(a: string, b: string): number {
   const wordsA = new Set(a.split(/\s+/));
   const wordsB = new Set(b.split(/\s+/));
 
-  const intersection = new Set([...wordsA].filter(w => wordsB.has(w)));
+  const intersection = new Set([...wordsA].filter((w) => wordsB.has(w)));
   const union = new Set([...wordsA, ...wordsB]);
 
   return intersection.size / union.size;

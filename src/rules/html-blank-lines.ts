@@ -12,19 +12,16 @@ export interface HtmlBlankLinesConfig {
 const HTML_OPEN_TAGS = ['<div', '<span', '<table', '<tr', '<td', '<th'];
 const HTML_CLOSE_TAGS = ['</div>', '</span>', '</table>', '</tr>', '</td>', '</th>'];
 const MARKDOWN_PATTERNS = [
-  /^#+\s/,           // Headers
-  /^[-*+]\s/,        // Unordered lists
-  /^\d+\.\s/,        // Ordered lists
-  /^\|/,             // Tables
-  /^>/,              // Blockquotes
-  /^```/,            // Code blocks
-  /^\*\*|^__/,       // Bold text at start
+  /^#+\s/, // Headers
+  /^[-*+]\s/, // Unordered lists
+  /^\d+\.\s/, // Ordered lists
+  /^\|/, // Tables
+  /^>/, // Blockquotes
+  /^```/, // Code blocks
+  /^\*\*|^__/ // Bold text at start
 ];
 
-export function htmlBlankLines(
-  content: string,
-  config: HtmlBlankLinesConfig = {}
-): LintError[] {
+export function htmlBlankLines(content: string, config: HtmlBlankLinesConfig = {}): LintError[] {
   if (config.enabled === false) {
     return [];
   }
@@ -77,11 +74,11 @@ export function htmlBlankLines(
 }
 
 function isHtmlOpenTag(line: string): boolean {
-  return HTML_OPEN_TAGS.some(tag => line.startsWith(tag));
+  return HTML_OPEN_TAGS.some((tag) => line.startsWith(tag));
 }
 
 function isHtmlCloseTag(line: string): boolean {
-  return HTML_CLOSE_TAGS.some(tag => line.startsWith(tag));
+  return HTML_CLOSE_TAGS.some((tag) => line.startsWith(tag));
 }
 
 function isHtmlTag(line: string): boolean {
@@ -93,6 +90,5 @@ function isMarkdownContent(line: string): boolean {
     return false;
   }
   // Check if it's markdown-like content
-  return MARKDOWN_PATTERNS.some(pattern => pattern.test(line)) ||
-         (line.length > 0 && !line.startsWith('<'));
+  return MARKDOWN_PATTERNS.some((pattern) => pattern.test(line)) || (line.length > 0 && !line.startsWith('<'));
 }

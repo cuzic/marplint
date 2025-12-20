@@ -3,7 +3,7 @@
  * Checks the number of content lines per slide
  */
 
-import { parseSlides, countContentLines, type Slide } from '../utils/slide-parser.js';
+import { countContentLines, parseSlides } from '../utils/slide-parser.js';
 
 export interface SlideLineCountConfig {
   enabled?: boolean;
@@ -27,10 +27,7 @@ const DEFAULT_CONFIG: Required<SlideLineCountConfig> = {
   ignoreCodeBlocks: false
 };
 
-export function slideLineCount(
-  content: string,
-  config: SlideLineCountConfig = {}
-): LintError[] {
+export function slideLineCount(content: string, config: SlideLineCountConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {

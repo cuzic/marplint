@@ -3,14 +3,14 @@
  * Suggests adding font-class when content is dense
  */
 
-import { parseSlides, countContentLines, hasFontClass, getFontClassLevel } from '../utils/slide-parser.js';
+import { countContentLines, getFontClassLevel, parseSlides } from '../utils/slide-parser.js';
 import type { LintError } from './slide-line-count.js';
 
 export interface MissingFontClassConfig {
   enabled?: boolean;
   thresholds?: {
-    small?: number;   // Lines threshold for font-small
-    xsmall?: number;  // Lines threshold for font-xsmall
+    small?: number; // Lines threshold for font-small
+    xsmall?: number; // Lines threshold for font-xsmall
     xxsmall?: number; // Lines threshold for font-xxsmall
   };
 }
@@ -24,10 +24,7 @@ const DEFAULT_CONFIG: Required<MissingFontClassConfig> = {
   }
 };
 
-export function missingFontClass(
-  content: string,
-  config: MissingFontClassConfig = {}
-): LintError[] {
+export function missingFontClass(content: string, config: MissingFontClassConfig = {}): LintError[] {
   const mergedConfig = {
     ...DEFAULT_CONFIG,
     thresholds: { ...DEFAULT_CONFIG.thresholds, ...config.thresholds }

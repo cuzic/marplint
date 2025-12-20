@@ -11,16 +11,16 @@
  *   marplint --format json src/slides/*.md
  */
 
-import { Command } from 'commander';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { resolve, basename } from 'path';
-import { glob } from 'glob';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 import chalk from 'chalk';
-import { loadConfig, type MarplintConfig } from './utils/config.js';
-import { runStaticRules, type LintError } from './rules/index.js';
-import { runVisualRules } from './visual/index.js';
-import { applyFixes, getFixableRules, type FixResult } from './fixers/index.js';
+import { Command } from 'commander';
+import { glob } from 'glob';
 import { analyzeDocument, formatAnalysisReport } from './analysis/index.js';
+import { applyFixes, type FixResult, getFixableRules } from './fixers/index.js';
+import { type LintError, runStaticRules } from './rules/index.js';
+import { loadConfig } from './utils/config.js';
+import { runVisualRules } from './visual/index.js';
 
 const VERSION = '1.2.0';
 
@@ -149,7 +149,11 @@ async function runLinter(
         warnings.push(...visualResult.warnings);
       } catch (error) {
         if (options.format === 'text') {
-          console.warn(chalk.yellow(`  ⚠️  Visual check failed for ${basename(file)}: ${error instanceof Error ? error.message : error}`));
+          console.warn(
+            chalk.yellow(
+              `  ⚠️  Visual check failed for ${basename(file)}: ${error instanceof Error ? error.message : error}`
+            )
+          );
         }
       }
     }
@@ -161,7 +165,7 @@ async function runLinter(
 
       if (fixResults.length > 0) {
         fixes = fixResults;
-        totalFixed += fixResults.filter(f => f.applied).length;
+        totalFixed += fixResults.filter((f) => f.applied).length;
 
         if (options.fix && !options.fixDryRun) {
           writeFileSync(absolutePath, fixedContent, 'utf-8');
@@ -174,8 +178,8 @@ async function runLinter(
     let filteredErrors = errors;
     let filteredWarnings = warnings;
     if (options.rule) {
-      filteredErrors = errors.filter(e => e.ruleId === options.rule);
-      filteredWarnings = warnings.filter(w => w.ruleId === options.rule);
+      filteredErrors = errors.filter((e) => e.ruleId === options.rule);
+      filteredWarnings = warnings.filter((w) => w.ruleId === options.rule);
     }
 
     // Count slides
@@ -212,10 +216,7 @@ async function runLinter(
   }
 }
 
-async function runAnalysis(
-  filePatterns: string[],
-  options: { format: string }
-) {
+async function runAnalysis(filePatterns: string[], options: { format: string }) {
   const files: string[] = [];
   for (const pattern of filePatterns) {
     const matches = await glob(pattern);
@@ -296,23 +297,17 @@ function outputFileResult(
   isDryRun?: boolean
 ) {
   const fileName = basename(file);
-  const status = errors.length === 0
-    ? chalk.green('✓')
-    : chalk.red('✗');
+  const status = errors.length === 0 ? chalk.green('✓') : chalk.red('✗');
 
   console.log(`${status} ${chalk.bold(fileName)} (${slideCount} slides)`);
 
   for (const error of errors) {
-    const location = error.lineNumber > 0
-      ? `line ${error.lineNumber}`
-      : `slide ${error.slideNumber}`;
+    const location = error.lineNumber > 0 ? `line ${error.lineNumber}` : `slide ${error.slideNumber}`;
     console.log(chalk.red(`    ✗ ${error.ruleId} [${location}]: ${error.message}`));
   }
 
   for (const warning of warnings) {
-    const location = warning.lineNumber > 0
-      ? `line ${warning.lineNumber}`
-      : `slide ${warning.slideNumber}`;
+    const location = warning.lineNumber > 0 ? `line ${warning.lineNumber}` : `slide ${warning.slideNumber}`;
     console.log(chalk.yellow(`    ⚠ ${warning.ruleId} [${location}]: ${warning.message}`));
   }
 
@@ -338,11 +333,7 @@ function formatOutput(results: LintResult[], totalFixed?: number): FormattedOutp
   return { summary, results };
 }
 
-function outputSummary(
-  summary: FormattedOutput['summary'],
-  fix?: boolean,
-  fixDryRun?: boolean
-) {
+function outputSummary(summary: FormattedOutput['summary'], _fix?: boolean, fixDryRun?: boolean) {
   console.log(chalk.bold('\n=== Summary ==='));
   console.log(`Files: ${summary.files}`);
   console.log(`Slides: ${summary.slides}`);
@@ -369,8 +360,10 @@ function outputSummary(
 function generateHtmlReport(output: FormattedOutput): string {
   const { summary, results } = output;
 
-  const errorRows = results.flatMap(r =>
-    [...r.errors, ...r.warnings].map(e => `
+  const errorRows = results
+    .flatMap((r) =>
+      [...r.errors, ...r.warnings].map(
+        (e) => `
       <tr class="${e.severity}">
         <td>${basename(r.file)}</td>
         <td>${e.slideNumber}</td>
@@ -378,8 +371,10 @@ function generateHtmlReport(output: FormattedOutput): string {
         <td>${e.message}</td>
         <td>${e.severity}</td>
       </tr>
-    `)
-  ).join('');
+    `
+      )
+    )
+    .join('');
 
   return `<!DOCTYPE html>
 <html>

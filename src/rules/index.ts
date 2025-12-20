@@ -2,40 +2,38 @@
  * Static rules for marplint
  */
 
-// Original rules
-export { slideLineCount, type SlideLineCountConfig, type LintError } from './slide-line-count.js';
-export { slideContentDensity, type SlideContentDensityConfig } from './slide-content-density.js';
-export { htmlBlankLines, type HtmlBlankLinesConfig } from './html-blank-lines.js';
-export { missingFontClass, type MissingFontClassConfig } from './missing-font-class.js';
-export { balancedColumns, type BalancedColumnsConfig } from './balanced-columns.js';
-
+export { type BalancedColumnsConfig, balancedColumns } from './balanced-columns.js';
+export { type CodeBlockLengthConfig, codeBlockLength } from './code-block-length.js';
+export { type DuplicateContentConfig, duplicateContent } from './duplicate-content.js';
 // New rules
-export { headingHierarchy, type HeadingHierarchyConfig } from './heading-hierarchy.js';
-export { codeBlockLength, type CodeBlockLengthConfig } from './code-block-length.js';
-export { linkValidity, type LinkValidityConfig } from './link-validity.js';
-export { japaneseConsistency, type JapaneseConsistencyConfig } from './japanese-consistency.js';
-export { slideTitleRequired, type SlideTitleRequiredConfig } from './slide-title-required.js';
-export { tableStructure, type TableStructureConfig } from './table-structure.js';
-export { duplicateContent, type DuplicateContentConfig } from './duplicate-content.js';
-export { maxNestedList, type MaxNestedListConfig } from './max-nested-list.js';
+export { type HeadingHierarchyConfig, headingHierarchy } from './heading-hierarchy.js';
+export { type HtmlBlankLinesConfig, htmlBlankLines } from './html-blank-lines.js';
+export { type JapaneseConsistencyConfig, japaneseConsistency } from './japanese-consistency.js';
+export { type LinkValidityConfig, linkValidity } from './link-validity.js';
+export { type MaxNestedListConfig, maxNestedList } from './max-nested-list.js';
+export { type MissingFontClassConfig, missingFontClass } from './missing-font-class.js';
+export { type SlideContentDensityConfig, slideContentDensity } from './slide-content-density.js';
+// Original rules
+export { type LintError, type SlideLineCountConfig, slideLineCount } from './slide-line-count.js';
+export { type SlideTitleRequiredConfig, slideTitleRequired } from './slide-title-required.js';
+export { type TableStructureConfig, tableStructure } from './table-structure.js';
 
+import type { MarplintConfig } from '../utils/config.js';
+import { balancedColumns } from './balanced-columns.js';
+import { codeBlockLength } from './code-block-length.js';
+import { duplicateContent } from './duplicate-content.js';
+import { headingHierarchy } from './heading-hierarchy.js';
+import { htmlBlankLines } from './html-blank-lines.js';
+import { japaneseConsistency } from './japanese-consistency.js';
+import { linkValidity } from './link-validity.js';
+import { maxNestedList } from './max-nested-list.js';
+import { missingFontClass } from './missing-font-class.js';
+import { slideContentDensity } from './slide-content-density.js';
+import type { LintError } from './slide-line-count.js';
 // Imports
 import { slideLineCount } from './slide-line-count.js';
-import { slideContentDensity } from './slide-content-density.js';
-import { htmlBlankLines } from './html-blank-lines.js';
-import { missingFontClass } from './missing-font-class.js';
-import { balancedColumns } from './balanced-columns.js';
-import { headingHierarchy } from './heading-hierarchy.js';
-import { codeBlockLength } from './code-block-length.js';
-import { linkValidity } from './link-validity.js';
-import { japaneseConsistency } from './japanese-consistency.js';
 import { slideTitleRequired } from './slide-title-required.js';
 import { tableStructure } from './table-structure.js';
-import { duplicateContent } from './duplicate-content.js';
-import { maxNestedList } from './max-nested-list.js';
-
-import type { LintError } from './slide-line-count.js';
-import type { MarplintConfig } from '../utils/config.js';
 
 export interface StaticLintResult {
   errors: LintError[];
@@ -59,11 +57,7 @@ function getRuleConfig<T>(config: MarplintConfig, ruleName: string): T | undefin
 /**
  * Run all static rules on content
  */
-export function runStaticRules(
-  content: string,
-  filePath: string,
-  config: MarplintConfig
-): StaticLintResult {
+export function runStaticRules(content: string, filePath: string, config: MarplintConfig): StaticLintResult {
   const allErrors: LintError[] = [];
 
   // Original rules
@@ -137,8 +131,8 @@ export function runStaticRules(
   const slideCount = (content.match(/\n---\n/g) || []).length + 1;
 
   return {
-    errors: allErrors.filter(e => e.severity === 'error'),
-    warnings: allErrors.filter(e => e.severity === 'warning'),
+    errors: allErrors.filter((e) => e.severity === 'error'),
+    warnings: allErrors.filter((e) => e.severity === 'warning'),
     fileInfo: {
       path: filePath,
       slideCount

@@ -3,10 +3,10 @@
  * Provides more accurate parsing than regex-based approach
  */
 
-import { unified } from 'unified';
+import type { Code, Heading, Image, Link, List, Root, Table } from 'mdast';
 import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import { visit } from 'unist-util-visit';
-import type { Root, Heading, Image, Link, Table, List, ListItem, Code, Text } from 'mdast';
 
 export interface ParsedHeading {
   level: number;
@@ -205,13 +205,7 @@ function getListDepth(parent: unknown): number {
 /**
  * Visit list items recursively
  */
-function visitListItems(
-  list: List,
-  depth: number,
-  ordered: boolean,
-  startLine: number,
-  items: ParsedListItem[]
-): void {
+function visitListItems(list: List, depth: number, ordered: boolean, startLine: number, items: ParsedListItem[]): void {
   for (const item of list.children) {
     const text = extractText(item);
     items.push({
@@ -224,13 +218,7 @@ function visitListItems(
     // Check for nested lists
     for (const child of item.children) {
       if ((child as { type: string }).type === 'list') {
-        visitListItems(
-          child as List,
-          depth + 1,
-          (child as List).ordered ?? false,
-          startLine,
-          items
-        );
+        visitListItems(child as List, depth + 1, (child as List).ordered ?? false, startLine, items);
       }
     }
   }

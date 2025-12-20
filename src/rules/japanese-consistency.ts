@@ -3,8 +3,8 @@
  * Checks for consistent use of full-width/half-width characters in Japanese text
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface JapaneseConsistencyConfig {
   enabled?: boolean;
@@ -29,12 +29,9 @@ const FULL_WIDTH_NUMBERS = /[０-９]/g;
 const FULL_WIDTH_ALPHABETS = /[Ａ-Ｚａ-ｚ]/g;
 const MIXED_PUNCTUATION = /[、。].*[,.]|[,.].*[、。]/;
 const FULL_WIDTH_PARENS = /[（）「」『』【】]/g;
-const HALF_WIDTH_PARENS = /[\(\)\[\]]/g;
+const HALF_WIDTH_PARENS = /[()[\]]/g;
 
-export function japaneseConsistency(
-  content: string,
-  config: JapaneseConsistencyConfig = {}
-): LintError[] {
+export function japaneseConsistency(content: string, config: JapaneseConsistencyConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {

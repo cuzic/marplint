@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface FontReadabilityConfig extends BaseVisualConfig {
   minFontSize?: number; // Minimum font size in pixels
@@ -38,7 +38,7 @@ class FontReadabilityRule extends BaseVisualRule<FontReadabilityConfig, FontRead
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page, config: Required<FontReadabilityConfig>): Promise<FontReadabilityResult[]> {
-    return await page.evaluate((warnSize: number) => {
+    return (await page.evaluate((warnSize: number) => {
       const sections = Array.from(document.querySelectorAll('section'));
 
       return sections.map((section, index) => {
@@ -60,9 +60,7 @@ class FontReadabilityRule extends BaseVisualRule<FontReadabilityConfig, FontRead
         });
 
         const minFontSize = fontSizes.length > 0 ? Math.min(...fontSizes) : 0;
-        const avgFontSize = fontSizes.length > 0
-          ? fontSizes.reduce((a, b) => a + b, 0) / fontSizes.length
-          : 0;
+        const avgFontSize = fontSizes.length > 0 ? fontSizes.reduce((a, b) => a + b, 0) / fontSizes.length : 0;
 
         return {
           slideNumber: index + 1,
@@ -72,7 +70,7 @@ class FontReadabilityRule extends BaseVisualRule<FontReadabilityConfig, FontRead
           elements: smallElements.slice(0, 3) // Limit to first 3
         };
       });
-    }, config.warnFontSize) as FontReadabilityResult[];
+    }, config.warnFontSize)) as FontReadabilityResult[];
   }
 
   protected convertToErrors(results: FontReadabilityResult[], config: Required<FontReadabilityConfig>): LintError[] {

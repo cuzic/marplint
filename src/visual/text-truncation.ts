@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface TextTruncationConfig extends BaseVisualConfig {}
 
@@ -31,7 +31,7 @@ class TextTruncationRule extends BaseVisualRule<TextTruncationConfig, TextTrunca
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page): Promise<TextTruncationResult[]> {
-    return await page.evaluate(() => {
+    return (await page.evaluate(() => {
       const sections = Array.from(document.querySelectorAll('section'));
 
       return sections.map((section, index) => {
@@ -50,7 +50,8 @@ class TextTruncationRule extends BaseVisualRule<TextTruncationConfig, TextTrunca
           if (!text) return;
 
           // Check for horizontal overflow
-          if (htmlEl.scrollWidth > htmlEl.clientWidth + 5) { // 5px tolerance
+          if (htmlEl.scrollWidth > htmlEl.clientWidth + 5) {
+            // 5px tolerance
             truncatedElements.push({
               text,
               scrollWidth: htmlEl.scrollWidth,
@@ -76,7 +77,7 @@ class TextTruncationRule extends BaseVisualRule<TextTruncationConfig, TextTrunca
           truncatedElements: truncatedElements.slice(0, 3)
         };
       });
-    }) as TextTruncationResult[];
+    })) as TextTruncationResult[];
   }
 
   protected convertToErrors(results: TextTruncationResult[]): LintError[] {

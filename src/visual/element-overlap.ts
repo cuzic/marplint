@@ -4,8 +4,8 @@
  */
 
 import type { Page } from 'playwright';
-import { BaseVisualRule, type BaseVisualConfig } from './base-visual-rule.js';
 import type { LintError } from '../rules/slide-line-count.js';
+import { type BaseVisualConfig, BaseVisualRule } from './base-visual-rule.js';
 
 export interface ElementOverlapConfig extends BaseVisualConfig {
   minOverlapArea?: number; // Minimum overlap area in pixels to report
@@ -34,7 +34,7 @@ class ElementOverlapRule extends BaseVisualRule<ElementOverlapConfig, ElementOve
   protected readonly defaultConfig = DEFAULT_CONFIG;
 
   protected async analyze(page: Page, config: Required<ElementOverlapConfig>): Promise<ElementOverlapResult[]> {
-    return await page.evaluate((minArea: number) => {
+    return (await page.evaluate((minArea: number) => {
       function getOverlapArea(rect1: DOMRect, rect2: DOMRect): number {
         const xOverlap = Math.max(0, Math.min(rect1.right, rect2.right) - Math.max(rect1.left, rect2.left));
         const yOverlap = Math.max(0, Math.min(rect1.bottom, rect2.bottom) - Math.max(rect1.top, rect2.top));
@@ -57,7 +57,9 @@ class ElementOverlapRule extends BaseVisualRule<ElementOverlapConfig, ElementOve
         }> = [];
 
         // Get all positioned or block elements
-        const elements = Array.from(section.querySelectorAll('h1, h2, h3, h4, h5, h6, p, ul, ol, table, div, img, figure'));
+        const elements = Array.from(
+          section.querySelectorAll('h1, h2, h3, h4, h5, h6, p, ul, ol, table, div, img, figure')
+        );
         const rects: Array<{ element: Element; rect: DOMRect }> = [];
 
         elements.forEach((el) => {
@@ -96,7 +98,7 @@ class ElementOverlapRule extends BaseVisualRule<ElementOverlapConfig, ElementOve
           overlaps: overlaps.slice(0, 3) // Limit to first 3
         };
       });
-    }, config.minOverlapArea) as ElementOverlapResult[];
+    }, config.minOverlapArea)) as ElementOverlapResult[];
   }
 
   protected convertToErrors(results: ElementOverlapResult[]): LintError[] {

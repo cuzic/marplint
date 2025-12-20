@@ -40,12 +40,12 @@ export function parseSlides(content: string): ParseResult {
   let currentSlideLines: string[] = [];
   let slideNumber = 0;
   let frontmatter: string | undefined;
-  let inFrontmatter = false;
+  let _inFrontmatter = false;
   let frontmatterEnd = 0;
 
   // Check for frontmatter
   if (lines[0]?.trim() === '---') {
-    inFrontmatter = true;
+    _inFrontmatter = true;
     for (let i = 1; i < lines.length; i++) {
       if (lines[i]?.trim() === '---') {
         frontmatter = lines.slice(0, i + 1).join('\n');
@@ -61,13 +61,15 @@ export function parseSlides(content: string): ParseResult {
 
     if (isSlideBreak && currentSlideLines.length > 0) {
       slideNumber++;
-      slides.push(createSlide(
-        slideNumber,
-        currentSlideStart + 1, // 1-indexed
-        i, // line before the ---
-        currentSlideLines,
-        slideNumber === 1
-      ));
+      slides.push(
+        createSlide(
+          slideNumber,
+          currentSlideStart + 1, // 1-indexed
+          i, // line before the ---
+          currentSlideLines,
+          slideNumber === 1
+        )
+      );
       currentSlideLines = [];
       currentSlideStart = i + 1;
     } else if (!isSlideBreak || i <= frontmatterEnd) {
@@ -76,15 +78,9 @@ export function parseSlides(content: string): ParseResult {
   }
 
   // Add the last slide
-  if (currentSlideLines.length > 0 || currentSlideLines.some(l => l.trim())) {
+  if (currentSlideLines.length > 0 || currentSlideLines.some((l) => l.trim())) {
     slideNumber++;
-    slides.push(createSlide(
-      slideNumber,
-      currentSlideStart + 1,
-      lines.length,
-      currentSlideLines,
-      slideNumber === 1
-    ));
+    slides.push(createSlide(slideNumber, currentSlideStart + 1, lines.length, currentSlideLines, slideNumber === 1));
   }
 
   return {
@@ -190,9 +186,7 @@ export function countCharacters(slide: Slide): number {
  * Count list items in slide
  */
 export function countListItems(slide: Slide): number {
-  return slide.contentLines.filter(line =>
-    line.trim().match(/^[-*+]\s/) || line.trim().match(/^\d+\.\s/)
-  ).length;
+  return slide.contentLines.filter((line) => line.trim().match(/^[-*+]\s/) || line.trim().match(/^\d+\.\s/)).length;
 }
 
 /**
@@ -200,10 +194,12 @@ export function countListItems(slide: Slide): number {
  */
 export function hasFontClass(slide: Slide): boolean {
   const directive = slide.directive?.toLowerCase() ?? '';
-  return directive.includes('font-small') ||
-         directive.includes('font-xsmall') ||
-         directive.includes('font-xxsmall') ||
-         directive.includes('font-large');
+  return (
+    directive.includes('font-small') ||
+    directive.includes('font-xsmall') ||
+    directive.includes('font-xxsmall') ||
+    directive.includes('font-large')
+  );
 }
 
 /**
@@ -220,19 +216,27 @@ export function getFontClassLevel(slide: Slide): number {
 /**
  * Find columns in slide
  */
-export function findColumns(slide: Slide): { left: string[], right: string[] } | null {
+export function findColumns(slide: Slide): { left: string[]; right: string[] } | null {
   const content = slide.lines.join('\n');
   const columnsMatch = content.match(/<div class="columns">([\s\S]*?)<\/div>\s*<\/div>/);
 
   if (!columnsMatch) return null;
 
   const columnsContent = columnsMatch[1] ?? '';
-  const divSections = columnsContent.split(/<div>/g).filter(s => s.trim());
+  const divSections = columnsContent.split(/<div>/g).filter((s) => s.trim());
 
   if (divSections.length < 2) return null;
 
-  const leftContent = divSections[0]?.replace(/<\/div>[\s\S]*$/, '').split('\n').filter(l => l.trim()) ?? [];
-  const rightContent = divSections[1]?.replace(/<\/div>[\s\S]*$/, '').split('\n').filter(l => l.trim()) ?? [];
+  const leftContent =
+    divSections[0]
+      ?.replace(/<\/div>[\s\S]*$/, '')
+      .split('\n')
+      .filter((l) => l.trim()) ?? [];
+  const rightContent =
+    divSections[1]
+      ?.replace(/<\/div>[\s\S]*$/, '')
+      .split('\n')
+      .filter((l) => l.trim()) ?? [];
 
   return { left: leftContent, right: rightContent };
 }

@@ -3,7 +3,7 @@
  * Checks content density (characters, list items) per slide
  */
 
-import { parseSlides, countCharacters, countListItems } from '../utils/slide-parser.js';
+import { countCharacters, countListItems, parseSlides } from '../utils/slide-parser.js';
 import type { LintError } from './slide-line-count.js';
 
 export interface SlideContentDensityConfig {
@@ -18,10 +18,7 @@ const DEFAULT_CONFIG: Required<SlideContentDensityConfig> = {
   maxListItems: 15
 };
 
-export function slideContentDensity(
-  content: string,
-  config: SlideContentDensityConfig = {}
-): LintError[] {
+export function slideContentDensity(content: string, config: SlideContentDensityConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {

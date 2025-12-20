@@ -3,8 +3,8 @@
  * Ensures each slide has a title (heading)
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface SlideTitleRequiredConfig {
   enabled?: boolean;
@@ -18,10 +18,7 @@ const DEFAULT_CONFIG: Required<SlideTitleRequiredConfig> = {
   skipSlides: []
 };
 
-export function slideTitleRequired(
-  content: string,
-  config: SlideTitleRequiredConfig = {}
-): LintError[] {
+export function slideTitleRequired(content: string, config: SlideTitleRequiredConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -33,7 +30,7 @@ export function slideTitleRequired(
   let slideStartLine = 1;
 
   visitSlides(content, {
-    onSlideStart(slideNumber: number, startLine: number) {
+    onSlideStart(_slideNumber: number, startLine: number) {
       hasTitle = false;
       slideStartLine = startLine;
     },

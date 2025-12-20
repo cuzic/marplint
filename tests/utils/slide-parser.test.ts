@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  parseSlides,
-  countContentLines,
   countCharacters,
+  countContentLines,
   countListItems,
+  getFontClassLevel,
   hasFontClass,
-  getFontClassLevel
+  parseSlides
 } from '../../src/utils/slide-parser.js';
 
 describe('parseSlides', () => {
@@ -147,7 +147,7 @@ describe('getFontClassLevel', () => {
       { directive: 'font-small', expected: 1 },
       { directive: 'font-xsmall', expected: 2 },
       { directive: 'font-xxsmall', expected: 3 },
-      { directive: 'other', expected: 0 },
+      { directive: 'other', expected: 0 }
     ];
 
     for (const { directive, expected } of testCases) {

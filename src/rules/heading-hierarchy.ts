@@ -3,8 +3,8 @@
  * Ensures proper heading hierarchy (h1 → h2 → h3 → h4, no skipping levels)
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface HeadingHierarchyConfig {
   enabled?: boolean;
@@ -23,10 +23,7 @@ interface Heading {
   slideNumber: number;
 }
 
-export function headingHierarchy(
-  content: string,
-  config: HeadingHierarchyConfig = {}
-): LintError[] {
+export function headingHierarchy(content: string, config: HeadingHierarchyConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -35,11 +32,11 @@ export function headingHierarchy(
 
   const errors: LintError[] = [];
   let headingsInSlide: Heading[] = [];
-  let currentSlide = 0;
+  let _currentSlide = 0;
 
   visitSlides(content, {
     onSlideStart(slideNumber: number) {
-      currentSlide = slideNumber;
+      _currentSlide = slideNumber;
       headingsInSlide = [];
     },
 

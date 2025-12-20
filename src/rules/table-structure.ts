@@ -3,8 +3,8 @@
  * Validates table structure and formatting
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface TableStructureConfig {
   enabled?: boolean;
@@ -30,10 +30,7 @@ interface Table {
   slideNumber: number;
 }
 
-export function tableStructure(
-  content: string,
-  config: TableStructureConfig = {}
-): LintError[] {
+export function tableStructure(content: string, config: TableStructureConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -52,13 +49,17 @@ export function tableStructure(
 
   const finalizeTable = () => {
     if (inTable && tableRows.length > 0) {
-      validateTable({
-        startLine: tableStartLine,
-        rows: tableRows,
-        hasHeader,
-        alignments,
-        slideNumber: currentTableSlide
-      }, errors, mergedConfig);
+      validateTable(
+        {
+          startLine: tableStartLine,
+          rows: tableRows,
+          hasHeader,
+          alignments,
+          slideNumber: currentTableSlide
+        },
+        errors,
+        mergedConfig
+      );
     }
     inTable = false;
     tableRows = [];
@@ -109,14 +110,14 @@ function parseTableRow(line: string): string[] {
   return line
     .split('|')
     .slice(1, -1)
-    .map(cell => cell.trim());
+    .map((cell) => cell.trim());
 }
 
 function parseAlignments(line: string): string[] {
   return line
     .split('|')
     .slice(1, -1)
-    .map(cell => {
+    .map((cell) => {
       const trimmed = cell.trim();
       if (trimmed.startsWith(':') && trimmed.endsWith(':')) return 'center';
       if (trimmed.endsWith(':')) return 'right';
@@ -125,11 +126,7 @@ function parseAlignments(line: string): string[] {
     });
 }
 
-function validateTable(
-  table: Table,
-  errors: LintError[],
-  config: Required<TableStructureConfig>
-): void {
+function validateTable(table: Table, errors: LintError[], config: Required<TableStructureConfig>): void {
   if (table.rows.length === 0) return;
 
   const columnCount = table.rows[0]?.length ?? 0;

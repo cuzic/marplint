@@ -158,8 +158,8 @@ export function extractImages(content: string): ImageInfo[] {
  */
 export function checkImageAltText(images: ImageInfo[]): ImageAltIssue[] {
   return images
-    .filter(img => !img.alt.trim())
-    .map(img => ({
+    .filter((img) => !img.alt.trim())
+    .map((img) => ({
       src: img.src,
       lineNumber: img.lineNumber
     }));
@@ -169,9 +169,7 @@ export function checkImageAltText(images: ImageInfo[]): ImageAltIssue[] {
  * Check if table has header separator row
  */
 export function hasTableHeader(content: string): boolean {
-  return content.includes('|---|') ||
-         content.includes('| --- |') ||
-         /\|[\s:-]+\|/.test(content);
+  return content.includes('|---|') || content.includes('| --- |') || /\|[\s:-]+\|/.test(content);
 }
 
 /**
@@ -190,7 +188,7 @@ export function extractTableRows(content: string): string[][] {
       const cells = trimmed
         .split('|')
         .slice(1, -1)
-        .map(cell => cell.trim());
+        .map((cell) => cell.trim());
       rows.push(cells);
     }
   }

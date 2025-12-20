@@ -3,8 +3,8 @@
  * Limits nesting depth of lists to improve readability
  */
 
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface MaxNestedListConfig {
   enabled?: boolean;
@@ -16,10 +16,7 @@ const DEFAULT_CONFIG: Required<MaxNestedListConfig> = {
   maxDepth: 3
 };
 
-export function maxNestedList(
-  content: string,
-  config: MaxNestedListConfig = {}
-): LintError[] {
+export function maxNestedList(content: string, config: MaxNestedListConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {

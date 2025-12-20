@@ -11,6 +11,9 @@
     "build": "tsup src/index.ts --format esm --dts",
     "dev": "tsup src/index.ts --format esm --watch",
     "lint": "bun run src/index.ts",
+    "check": "biome check ./src ./tests",
+    "check:fix": "biome check ./src ./tests --write",
+    "format": "biome format ./src ./tests --write",
     "test": "vitest"
   },
   "dependencies": {
@@ -24,6 +27,7 @@
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
     "tsup": "^8.3.0",

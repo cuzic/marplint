@@ -4,33 +4,32 @@
 
 // Base class and utilities
 export {
-  BaseVisualRule,
   type BaseVisualConfig,
-  type VisualCheckResult,
-  detectInstalledBrowser,
+  BaseVisualRule,
   buildMarpHtml,
+  cleanupTmpDir,
+  detectInstalledBrowser,
+  getMergedViewport,
   launchBrowser,
   setupPage,
-  cleanupTmpDir,
-  getMergedViewport
+  type VisualCheckResult
 } from './base-visual-rule.js';
-
+export { type ColorContrastConfig, type ColorContrastResult, checkColorContrast } from './color-contrast.js';
+export { checkElementOverlap, type ElementOverlapConfig, type ElementOverlapResult } from './element-overlap.js';
+export { checkFontReadability, type FontReadabilityConfig, type FontReadabilityResult } from './font-readability.js';
 // Visual rules
 export { checkOverflow, type OverflowCheckerConfig, type OverflowResult } from './overflow-checker.js';
-export { checkWhitespace, type WhitespaceCheckerConfig, type WhitespaceResult } from './whitespace-checker.js';
-export { checkFontReadability, type FontReadabilityConfig, type FontReadabilityResult } from './font-readability.js';
-export { checkColorContrast, type ColorContrastConfig, type ColorContrastResult } from './color-contrast.js';
-export { checkElementOverlap, type ElementOverlapConfig, type ElementOverlapResult } from './element-overlap.js';
 export { checkTextTruncation, type TextTruncationConfig, type TextTruncationResult } from './text-truncation.js';
+export { checkWhitespace, type WhitespaceCheckerConfig, type WhitespaceResult } from './whitespace-checker.js';
 
-import { checkOverflow } from './overflow-checker.js';
-import { checkWhitespace } from './whitespace-checker.js';
-import { checkFontReadability } from './font-readability.js';
-import { checkColorContrast } from './color-contrast.js';
-import { checkElementOverlap } from './element-overlap.js';
-import { checkTextTruncation } from './text-truncation.js';
 import type { LintError } from '../rules/slide-line-count.js';
 import type { MarplintConfig } from '../utils/config.js';
+import { checkColorContrast } from './color-contrast.js';
+import { checkElementOverlap } from './element-overlap.js';
+import { checkFontReadability } from './font-readability.js';
+import { checkOverflow } from './overflow-checker.js';
+import { checkTextTruncation } from './text-truncation.js';
+import { checkWhitespace } from './whitespace-checker.js';
 
 export interface VisualLintResult {
   errors: LintError[];
@@ -56,10 +55,7 @@ function getVisualRuleConfig<T>(config: MarplintConfig, ruleName: string): T | u
 /**
  * Run all visual rules on a markdown file
  */
-export async function runVisualRules(
-  markdownPath: string,
-  config: MarplintConfig
-): Promise<VisualLintResult> {
+export async function runVisualRules(markdownPath: string, config: MarplintConfig): Promise<VisualLintResult> {
   const allErrors: LintError[] = [];
   let overflowResults: import('./overflow-checker.js').OverflowResult[] = [];
   let whitespaceResults: import('./whitespace-checker.js').WhitespaceResult[] = [];
@@ -135,8 +131,8 @@ export async function runVisualRules(
   }
 
   return {
-    errors: allErrors.filter(e => e.severity === 'error'),
-    warnings: allErrors.filter(e => e.severity === 'warning'),
+    errors: allErrors.filter((e) => e.severity === 'error'),
+    warnings: allErrors.filter((e) => e.severity === 'warning'),
     overflowResults,
     whitespaceResults,
     fontReadabilityResults,

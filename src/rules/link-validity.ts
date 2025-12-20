@@ -3,10 +3,10 @@
  * Validates links in slides (broken links, missing anchors)
  */
 
-import { existsSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { type LineContext, visitSlides } from '../utils/slide-visitor.js';
 import type { LintError } from './slide-line-count.js';
-import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface LinkValidityConfig {
   enabled?: boolean;
@@ -32,11 +32,7 @@ interface Link {
   isImage: boolean;
 }
 
-export function linkValidity(
-  content: string,
-  filePath: string,
-  config: LinkValidityConfig = {}
-): LintError[] {
+export function linkValidity(content: string, filePath: string, config: LinkValidityConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
   if (!mergedConfig.enabled) {
@@ -123,12 +119,7 @@ export function linkValidity(
   return errors;
 }
 
-function validateLink(
-  link: Link,
-  filePath: string,
-  errors: LintError[],
-  config: Required<LinkValidityConfig>
-): void {
+function validateLink(link: Link, filePath: string, errors: LintError[], config: Required<LinkValidityConfig>): void {
   const url = link.url.trim();
 
   // Skip empty URLs
