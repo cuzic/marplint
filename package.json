@@ -8,13 +8,15 @@
     "marplint": "dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "lint": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
     "check": "biome check ./src ./tests",
     "check:fix": "biome check ./src ./tests --write",
     "format": "biome format ./src ./tests --write",
-    "test": "vitest"
+    "test": "vitest",
+    "validate": "bun run typecheck && bun run check && bun run test run"
   },
   "dependencies": {
     "chalk": "^5.3.0",

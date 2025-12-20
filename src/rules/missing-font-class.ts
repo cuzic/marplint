@@ -15,7 +15,16 @@ export interface MissingFontClassConfig {
   };
 }
 
-const DEFAULT_CONFIG: Required<MissingFontClassConfig> = {
+interface ResolvedMissingFontClassConfig {
+  enabled: boolean;
+  thresholds: {
+    small: number;
+    xsmall: number;
+    xxsmall: number;
+  };
+}
+
+const DEFAULT_CONFIG: ResolvedMissingFontClassConfig = {
   enabled: true,
   thresholds: {
     small: 15,
@@ -25,9 +34,13 @@ const DEFAULT_CONFIG: Required<MissingFontClassConfig> = {
 };
 
 export function missingFontClass(content: string, config: MissingFontClassConfig = {}): LintError[] {
-  const mergedConfig = {
-    ...DEFAULT_CONFIG,
-    thresholds: { ...DEFAULT_CONFIG.thresholds, ...config.thresholds }
+  const mergedConfig: ResolvedMissingFontClassConfig = {
+    enabled: config.enabled ?? DEFAULT_CONFIG.enabled,
+    thresholds: {
+      small: config.thresholds?.small ?? DEFAULT_CONFIG.thresholds.small,
+      xsmall: config.thresholds?.xsmall ?? DEFAULT_CONFIG.thresholds.xsmall,
+      xxsmall: config.thresholds?.xxsmall ?? DEFAULT_CONFIG.thresholds.xxsmall
+    }
   };
 
   if (!mergedConfig.enabled) {

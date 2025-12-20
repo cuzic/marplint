@@ -87,6 +87,7 @@ async function runLinter(
     rule?: string;
     fix?: boolean;
     fixDryRun?: boolean;
+    watch?: boolean;
     color?: boolean;
   }
 ) {

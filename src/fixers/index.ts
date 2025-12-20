@@ -77,7 +77,6 @@ function fixHtmlBlankLines(
 
   for (const error of errors) {
     const lineIndex = error.lineNumber - 1;
-    const _line = lines[lineIndex] ?? '';
     const prevLine = lines[lineIndex - 1] ?? '';
     const nextLine = lines[lineIndex + 1] ?? '';
 

@@ -40,12 +40,10 @@ export function parseSlides(content: string): ParseResult {
   let currentSlideLines: string[] = [];
   let slideNumber = 0;
   let frontmatter: string | undefined;
-  let _inFrontmatter = false;
   let frontmatterEnd = 0;
 
   // Check for frontmatter
   if (lines[0]?.trim() === '---') {
-    _inFrontmatter = true;
     for (let i = 1; i < lines.length; i++) {
       if (lines[i]?.trim() === '---') {
         frontmatter = lines.slice(0, i + 1).join('\n');

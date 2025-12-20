@@ -32,11 +32,9 @@ export function headingHierarchy(content: string, config: HeadingHierarchyConfig
 
   const errors: LintError[] = [];
   let headingsInSlide: Heading[] = [];
-  let _currentSlide = 0;
 
   visitSlides(content, {
-    onSlideStart(slideNumber: number) {
-      _currentSlide = slideNumber;
+    onSlideStart() {
       headingsInSlide = [];
     },
 
