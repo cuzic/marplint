@@ -4,6 +4,7 @@
  */
 
 import type { LintError } from './slide-line-count.js';
+import { visitSlides, type LineContext } from '../utils/slide-visitor.js';
 
 export interface TableStructureConfig {
   enabled?: boolean;
@@ -39,103 +40,67 @@ export function tableStructure(
     return [];
   }
 
-  const lines = content.split('\n');
   const errors: LintError[] = [];
-  let currentSlide = 1;
-  let inFrontmatter = false;
-  let inCodeBlock = false;
 
-  // Track table parsing
+  // Track table parsing state
   let inTable = false;
   let tableStartLine = 0;
   let tableRows: string[][] = [];
   let hasHeader = false;
   let alignments: string[] = [];
+  let currentTableSlide = 0;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const lineNumber = i + 1;
-
-    // Track frontmatter
-    if (line.trim() === '---') {
-      if (i === 0) {
-        inFrontmatter = true;
-        continue;
-      } else if (inFrontmatter) {
-        inFrontmatter = false;
-        continue;
-      } else {
-        // End table if in one
-        if (inTable) {
-          validateTable({
-            startLine: tableStartLine,
-            rows: tableRows,
-            hasHeader,
-            alignments,
-            slideNumber: currentSlide
-          }, errors, mergedConfig);
-          inTable = false;
-          tableRows = [];
-        }
-        currentSlide++;
-        continue;
-      }
-    }
-
-    if (inFrontmatter) continue;
-
-    // Track code blocks
-    if (line.trim().startsWith('```')) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Check for table row
-    const isTableRow = line.trim().startsWith('|') && line.trim().endsWith('|');
-    const isSeparator = /^\|[\s\-:|]+\|$/.test(line.trim());
-
-    if (isTableRow || isSeparator) {
-      if (!inTable) {
-        inTable = true;
-        tableStartLine = lineNumber;
-        tableRows = [];
-        hasHeader = false;
-        alignments = [];
-      }
-
-      if (isSeparator) {
-        hasHeader = true;
-        // Parse alignments
-        alignments = parseAlignments(line);
-      } else {
-        const cells = parseTableRow(line);
-        tableRows.push(cells);
-      }
-    } else if (inTable) {
-      // End of table
+  const finalizeTable = () => {
+    if (inTable && tableRows.length > 0) {
       validateTable({
         startLine: tableStartLine,
         rows: tableRows,
         hasHeader,
         alignments,
-        slideNumber: currentSlide
+        slideNumber: currentTableSlide
       }, errors, mergedConfig);
-      inTable = false;
-      tableRows = [];
     }
-  }
+    inTable = false;
+    tableRows = [];
+    hasHeader = false;
+    alignments = [];
+  };
+
+  visitSlides(content, {
+    onSlideEnd() {
+      finalizeTable();
+    },
+
+    onLine(line: string, context: LineContext) {
+      const trimmedLine = line.trim();
+      const isTableRow = trimmedLine.startsWith('|') && trimmedLine.endsWith('|');
+      const isSeparator = /^\|[\s\-:|]+\|$/.test(trimmedLine);
+
+      if (isTableRow || isSeparator) {
+        if (!inTable) {
+          inTable = true;
+          tableStartLine = context.lineNumber;
+          tableRows = [];
+          hasHeader = false;
+          alignments = [];
+          currentTableSlide = context.slideNumber;
+        }
+
+        if (isSeparator) {
+          hasHeader = true;
+          alignments = parseAlignments(line);
+        } else {
+          const cells = parseTableRow(line);
+          tableRows.push(cells);
+        }
+      } else if (inTable) {
+        finalizeTable();
+      }
+    }
+  });
 
   // Handle table at end of file
-  if (inTable) {
-    validateTable({
-      startLine: tableStartLine,
-      rows: tableRows,
-      hasHeader,
-      alignments,
-      slideNumber: currentSlide
-    }, errors, mergedConfig);
-  }
+  finalizeTable();
 
   return errors;
 }
