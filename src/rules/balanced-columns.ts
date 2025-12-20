@@ -18,69 +18,84 @@ const DEFAULT_CONFIG: Required<BalancedColumnsConfig> = {
   minColumnLines: 3
 };
 
+interface ColumnInfo {
+  leftCount: number;
+  rightCount: number;
+  imbalance: number;
+}
+
+/** Check if slide has columns layout */
+function hasColumns(lines: string[]): boolean {
+  return lines.some((line) => line.includes('class="columns"') || line.includes("class='columns'"));
+}
+
+/** Calculate column imbalance */
+function getColumnInfo(leftCount: number, rightCount: number): ColumnInfo {
+  const imbalance = Math.abs(leftCount - rightCount) / Math.max(leftCount, rightCount, 1);
+  return { leftCount, rightCount, imbalance };
+}
+
+/** Report imbalance error */
+function reportImbalance(
+  slide: { slideNumber: number; startLine: number },
+  info: ColumnInfo,
+  errors: LintError[]
+): void {
+  const shorter = info.leftCount < info.rightCount ? 'left' : 'right';
+  const longer = info.leftCount < info.rightCount ? 'right' : 'left';
+  errors.push({
+    ruleId: 'marp/balanced-columns',
+    slideNumber: slide.slideNumber,
+    lineNumber: slide.startLine,
+    message: `Slide ${slide.slideNumber} has unbalanced columns: ${shorter} has ${Math.min(info.leftCount, info.rightCount)} lines, ${longer} has ${Math.max(info.leftCount, info.rightCount)} lines (${Math.round(info.imbalance * 100)}% imbalance)`,
+    severity: 'warning'
+  });
+}
+
+/** Report short column error */
+function reportShortColumn(
+  slide: { slideNumber: number; startLine: number },
+  side: 'left' | 'right',
+  count: number,
+  errors: LintError[]
+): void {
+  errors.push({
+    ruleId: 'marp/balanced-columns',
+    slideNumber: slide.slideNumber,
+    lineNumber: slide.startLine,
+    message: `Slide ${slide.slideNumber} has a very short ${side} column (${count} lines). Consider restructuring.`,
+    severity: 'warning'
+  });
+}
+
 export function balancedColumns(content: string, config: BalancedColumnsConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-
-  if (!mergedConfig.enabled) {
-    return [];
-  }
+  if (!mergedConfig.enabled) return [];
 
   const { slides } = parseSlides(content);
   const errors: LintError[] = [];
 
   for (const slide of slides) {
-    // Check if slide has columns
-    const hasColumnsDiv = slide.lines.some(
-      (line) => line.includes('class="columns"') || line.includes("class='columns'")
-    );
+    if (!hasColumns(slide.lines)) continue;
 
-    if (!hasColumnsDiv) continue;
-
-    // Parse column content
     const columns = findColumns(slide);
     if (!columns) continue;
 
-    const leftCount = columns.left.length;
-    const rightCount = columns.right.length;
-    const total = leftCount + rightCount;
+    const info = getColumnInfo(columns.left.length, columns.right.length);
+    const total = info.leftCount + info.rightCount;
 
-    if (total < mergedConfig.minColumnLines * 2) {
-      continue; // Skip if both columns are very small
+    if (total < mergedConfig.minColumnLines * 2) continue;
+
+    if (info.imbalance > mergedConfig.maxImbalance) {
+      reportImbalance(slide, info, errors);
     }
 
-    const imbalance = Math.abs(leftCount - rightCount) / Math.max(leftCount, rightCount, 1);
-
-    if (imbalance > mergedConfig.maxImbalance) {
-      const shorter = leftCount < rightCount ? 'left' : 'right';
-      const longer = leftCount < rightCount ? 'right' : 'left';
-      errors.push({
-        ruleId: 'marp/balanced-columns',
-        slideNumber: slide.slideNumber,
-        lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has unbalanced columns: ${shorter} has ${Math.min(leftCount, rightCount)} lines, ${longer} has ${Math.max(leftCount, rightCount)} lines (${Math.round(imbalance * 100)}% imbalance)`,
-        severity: 'warning'
-      });
+    const minLines = mergedConfig.minColumnLines;
+    if (info.leftCount < minLines && info.rightCount >= minLines * 2) {
+      reportShortColumn(slide, 'left', info.leftCount, errors);
     }
-
-    // Check for very short column
-    if (leftCount < mergedConfig.minColumnLines && rightCount >= mergedConfig.minColumnLines * 2) {
-      errors.push({
-        ruleId: 'marp/balanced-columns',
-        slideNumber: slide.slideNumber,
-        lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has a very short left column (${leftCount} lines). Consider restructuring.`,
-        severity: 'warning'
-      });
-    }
-
-    if (rightCount < mergedConfig.minColumnLines && leftCount >= mergedConfig.minColumnLines * 2) {
-      errors.push({
-        ruleId: 'marp/balanced-columns',
-        slideNumber: slide.slideNumber,
-        lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has a very short right column (${rightCount} lines). Consider restructuring.`,
-        severity: 'warning'
-      });
+    if (info.rightCount < minLines && info.leftCount >= minLines * 2) {
+      reportShortColumn(slide, 'right', info.rightCount, errors);
     }
   }
 

@@ -33,8 +33,8 @@ const DEFAULT_CONFIG: ResolvedMissingFontClassConfig = {
   }
 };
 
-export function missingFontClass(content: string, config: MissingFontClassConfig = {}): LintError[] {
-  const mergedConfig: ResolvedMissingFontClassConfig = {
+function mergeConfig(config: MissingFontClassConfig): ResolvedMissingFontClassConfig {
+  return {
     enabled: config.enabled ?? DEFAULT_CONFIG.enabled,
     thresholds: {
       small: config.thresholds?.small ?? DEFAULT_CONFIG.thresholds.small,
@@ -42,46 +42,38 @@ export function missingFontClass(content: string, config: MissingFontClassConfig
       xxsmall: config.thresholds?.xxsmall ?? DEFAULT_CONFIG.thresholds.xxsmall
     }
   };
+}
 
-  if (!mergedConfig.enabled) {
-    return [];
-  }
+function getSuggestedFontClass(
+  lineCount: number,
+  currentLevel: number,
+  thresholds: ResolvedMissingFontClassConfig['thresholds']
+): string | null {
+  if (lineCount >= thresholds.xxsmall && currentLevel < 3) return 'font-xxsmall';
+  if (lineCount >= thresholds.xsmall && currentLevel < 2) return 'font-xsmall';
+  if (lineCount >= thresholds.small && currentLevel < 1) return 'font-small';
+  return null;
+}
+
+export function missingFontClass(content: string, config: MissingFontClassConfig = {}): LintError[] {
+  const mergedConfig = mergeConfig(config);
+  if (!mergedConfig.enabled) return [];
 
   const { slides } = parseSlides(content);
   const errors: LintError[] = [];
 
   for (const slide of slides) {
-    // Skip first slide with frontmatter
-    if (slide.hasFrontmatter && slide.slideNumber === 1) {
-      continue;
-    }
+    if (slide.hasFrontmatter && slide.slideNumber === 1) continue;
 
     const lineCount = countContentLines(slide);
-    const currentFontLevel = getFontClassLevel(slide);
+    const suggested = getSuggestedFontClass(lineCount, getFontClassLevel(slide), mergedConfig.thresholds);
 
-    // Check if slide needs a smaller font
-    if (lineCount >= mergedConfig.thresholds.xxsmall && currentFontLevel < 3) {
+    if (suggested) {
       errors.push({
         ruleId: 'marp/missing-font-class',
         slideNumber: slide.slideNumber,
         lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has ${lineCount} lines. Consider using "font-xxsmall" class.`,
-        severity: 'warning'
-      });
-    } else if (lineCount >= mergedConfig.thresholds.xsmall && currentFontLevel < 2) {
-      errors.push({
-        ruleId: 'marp/missing-font-class',
-        slideNumber: slide.slideNumber,
-        lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has ${lineCount} lines. Consider using "font-xsmall" class.`,
-        severity: 'warning'
-      });
-    } else if (lineCount >= mergedConfig.thresholds.small && currentFontLevel < 1) {
-      errors.push({
-        ruleId: 'marp/missing-font-class',
-        slideNumber: slide.slideNumber,
-        lineNumber: slide.startLine,
-        message: `Slide ${slide.slideNumber} has ${lineCount} lines. Consider using "font-small" class.`,
+        message: `Slide ${slide.slideNumber} has ${lineCount} lines. Consider using "${suggested}" class.`,
         severity: 'warning'
       });
     }

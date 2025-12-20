@@ -31,81 +31,85 @@ const MIXED_PUNCTUATION = /[、。].*[,.]|[,.].*[、。]/;
 const FULL_WIDTH_PARENS = /[（）「」『』【】]/g;
 const HALF_WIDTH_PARENS = /[()[\]]/g;
 
+/** Clean text for analysis by removing code and URLs */
+function cleanTextForAnalysis(line: string): string {
+  return line
+    .replace(/`[^`]+`/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/https?:\/\/[^\s]+/g, '');
+}
+
+/** Check and report full-width numbers */
+function checkFullWidthNumbers(text: string, context: LineContext, errors: LintError[]): void {
+  const matches = text.match(FULL_WIDTH_NUMBERS);
+  if (matches?.length) {
+    errors.push({
+      ruleId: 'marp/japanese-consistency',
+      slideNumber: context.slideNumber,
+      lineNumber: context.lineNumber,
+      message: `Slide ${context.slideNumber}: Full-width numbers found. Consider using half-width: ${matches.join('')}`,
+      severity: 'warning'
+    });
+  }
+}
+
+/** Check and report full-width alphabets */
+function checkFullWidthAlphabets(text: string, context: LineContext, errors: LintError[]): void {
+  const matches = text.match(FULL_WIDTH_ALPHABETS);
+  if (matches?.length) {
+    errors.push({
+      ruleId: 'marp/japanese-consistency',
+      slideNumber: context.slideNumber,
+      lineNumber: context.lineNumber,
+      message: `Slide ${context.slideNumber}: Full-width alphabets found. Consider using half-width: ${matches.join('')}`,
+      severity: 'warning'
+    });
+  }
+}
+
+/** Check and report mixed punctuation */
+function checkMixedPunctuation(text: string, context: LineContext, errors: LintError[]): void {
+  if (MIXED_PUNCTUATION.test(text)) {
+    errors.push({
+      ruleId: 'marp/japanese-consistency',
+      slideNumber: context.slideNumber,
+      lineNumber: context.lineNumber,
+      message: `Slide ${context.slideNumber}: Mixed Japanese and Western punctuation. Use consistent style.`,
+      severity: 'warning'
+    });
+  }
+}
+
+/** Check and report mixed parentheses */
+function checkMixedParentheses(text: string, context: LineContext, errors: LintError[]): void {
+  const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+  if (hasJapanese && FULL_WIDTH_PARENS.test(text) && HALF_WIDTH_PARENS.test(text)) {
+    errors.push({
+      ruleId: 'marp/japanese-consistency',
+      slideNumber: context.slideNumber,
+      lineNumber: context.lineNumber,
+      message: `Slide ${context.slideNumber}: Mixed full-width and half-width parentheses. Consider using consistent style.`,
+      severity: 'warning'
+    });
+  }
+}
+
 export function japaneseConsistency(content: string, config: JapaneseConsistencyConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-
-  if (!mergedConfig.enabled) {
-    return [];
-  }
+  if (!mergedConfig.enabled) return [];
 
   const errors: LintError[] = [];
 
   visitSlides(content, {
     onLine(line: string, context: LineContext) {
-      // Skip HTML comments
       if (line.trim().startsWith('<!--')) return;
 
-      // Skip URLs and code spans
-      const textToCheck = line
-        .replace(/`[^`]+`/g, '') // Remove inline code
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Keep link text only
-        .replace(/https?:\/\/[^\s]+/g, ''); // Remove URLs
+      const text = cleanTextForAnalysis(line);
 
-      // Check full-width numbers (if preferring half-width)
-      if (!mergedConfig.preferFullWidthNumbers) {
-        const fullWidthNums = textToCheck.match(FULL_WIDTH_NUMBERS);
-        if (fullWidthNums && fullWidthNums.length > 0) {
-          errors.push({
-            ruleId: 'marp/japanese-consistency',
-            slideNumber: context.slideNumber,
-            lineNumber: context.lineNumber,
-            message: `Slide ${context.slideNumber}: Full-width numbers found. Consider using half-width: ${fullWidthNums.join('')}`,
-            severity: 'warning'
-          });
-        }
-      }
-
-      // Check full-width alphabets (if preferring half-width)
-      if (!mergedConfig.preferFullWidthAlphabets) {
-        const fullWidthAlpha = textToCheck.match(FULL_WIDTH_ALPHABETS);
-        if (fullWidthAlpha && fullWidthAlpha.length > 0) {
-          errors.push({
-            ruleId: 'marp/japanese-consistency',
-            slideNumber: context.slideNumber,
-            lineNumber: context.lineNumber,
-            message: `Slide ${context.slideNumber}: Full-width alphabets found. Consider using half-width: ${fullWidthAlpha.join('')}`,
-            severity: 'warning'
-          });
-        }
-      }
-
-      // Check mixed punctuation
-      if (mergedConfig.checkPunctuation && MIXED_PUNCTUATION.test(textToCheck)) {
-        errors.push({
-          ruleId: 'marp/japanese-consistency',
-          slideNumber: context.slideNumber,
-          lineNumber: context.lineNumber,
-          message: `Slide ${context.slideNumber}: Mixed Japanese and Western punctuation. Use consistent style.`,
-          severity: 'warning'
-        });
-      }
-
-      // Check mixed parentheses in Japanese context
-      if (mergedConfig.checkParentheses) {
-        const hasFullWidthParens = FULL_WIDTH_PARENS.test(textToCheck);
-        const hasHalfWidthParens = HALF_WIDTH_PARENS.test(textToCheck);
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(textToCheck);
-
-        if (hasJapanese && hasFullWidthParens && hasHalfWidthParens) {
-          errors.push({
-            ruleId: 'marp/japanese-consistency',
-            slideNumber: context.slideNumber,
-            lineNumber: context.lineNumber,
-            message: `Slide ${context.slideNumber}: Mixed full-width and half-width parentheses. Consider using consistent style.`,
-            severity: 'warning'
-          });
-        }
-      }
+      if (!mergedConfig.preferFullWidthNumbers) checkFullWidthNumbers(text, context, errors);
+      if (!mergedConfig.preferFullWidthAlphabets) checkFullWidthAlphabets(text, context, errors);
+      if (mergedConfig.checkPunctuation) checkMixedPunctuation(text, context, errors);
+      if (mergedConfig.checkParentheses) checkMixedParentheses(text, context, errors);
     }
   });
 

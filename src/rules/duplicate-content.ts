@@ -28,12 +28,35 @@ interface SlideContent {
   normalizedContent: string;
 }
 
+/** Check if slide has sufficient content */
+function hasEnoughContent(slide: SlideContent | undefined, minLength: number): slide is SlideContent {
+  return !!slide && slide.normalizedContent.length >= minLength;
+}
+
+/** Report duplicate slide pair */
+function reportDuplicate(
+  slideA: SlideContent,
+  slideB: SlideContent,
+  similarity: number,
+  reportedPairs: Set<string>,
+  errors: LintError[]
+): void {
+  const pairKey = `${slideA.slideNumber}-${slideB.slideNumber}`;
+  if (reportedPairs.has(pairKey)) return;
+
+  reportedPairs.add(pairKey);
+  errors.push({
+    ruleId: 'marp/duplicate-content',
+    slideNumber: slideA.slideNumber,
+    lineNumber: slideA.startLine,
+    message: `Slide ${slideA.slideNumber} and ${slideB.slideNumber} are ${Math.round(similarity * 100)}% similar. Consider consolidating.`,
+    severity: 'warning'
+  });
+}
+
 export function duplicateContent(content: string, config: DuplicateContentConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-
-  if (!mergedConfig.enabled) {
-    return [];
-  }
+  if (!mergedConfig.enabled) return [];
 
   const slides = parseSlides(content);
   const errors: LintError[] = [];
@@ -41,30 +64,15 @@ export function duplicateContent(content: string, config: DuplicateContentConfig
 
   for (let i = 0; i < slides.length; i++) {
     const slideA = slides[i];
-    if (!slideA || slideA.normalizedContent.length < mergedConfig.minContentLength) {
-      continue;
-    }
+    if (!hasEnoughContent(slideA, mergedConfig.minContentLength)) continue;
 
     for (let j = i + 1; j < slides.length; j++) {
       const slideB = slides[j];
-      if (!slideB || slideB.normalizedContent.length < mergedConfig.minContentLength) {
-        continue;
-      }
+      if (!hasEnoughContent(slideB, mergedConfig.minContentLength)) continue;
 
       const similarity = calculateSimilarity(slideA.normalizedContent, slideB.normalizedContent);
-
       if (similarity >= mergedConfig.similarityThreshold) {
-        const pairKey = `${slideA.slideNumber}-${slideB.slideNumber}`;
-        if (!reportedPairs.has(pairKey)) {
-          reportedPairs.add(pairKey);
-          errors.push({
-            ruleId: 'marp/duplicate-content',
-            slideNumber: slideA.slideNumber,
-            lineNumber: slideA.startLine,
-            message: `Slide ${slideA.slideNumber} and ${slideB.slideNumber} are ${Math.round(similarity * 100)}% similar. Consider consolidating.`,
-            severity: 'warning'
-          });
-        }
+        reportDuplicate(slideA, slideB, similarity, reportedPairs, errors);
       }
     }
   }

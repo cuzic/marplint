@@ -79,131 +79,125 @@ program
 
 program.parse();
 
-async function runLinter(
-  filePatterns: string[],
-  options: {
-    static?: boolean;
-    visual?: boolean;
-    format: string;
-    config?: string;
-    rule?: string;
-    fix?: boolean;
-    fixDryRun?: boolean;
-    watch?: boolean;
-    color?: boolean;
-  }
-) {
-  // Expand glob patterns
+interface LinterOptions {
+  static?: boolean;
+  visual?: boolean;
+  format: string;
+  config?: string;
+  rule?: string;
+  fix?: boolean;
+  fixDryRun?: boolean;
+  watch?: boolean;
+  color?: boolean;
+}
+
+async function expandGlobPatterns(filePatterns: string[]): Promise<string[]> {
   const files: string[] = [];
   for (const pattern of filePatterns) {
     const matches = await glob(pattern);
     files.push(...matches);
   }
+  return files;
+}
 
-  if (files.length === 0) {
-    console.error(chalk.yellow('No files found matching the patterns'));
-    process.exit(1);
+function printLinterHeader(fileCount: number, fix?: boolean): void {
+  console.log(chalk.cyan.bold('\n🔍 marplint - Marp Slide Linter\n'));
+  console.log(chalk.blue(`Scanning ${fileCount} file(s)...\n`));
+  if (fix) {
+    console.log(chalk.magenta(`Auto-fix enabled. Fixable rules: ${getFixableRules().join(', ')}\n`));
+  }
+}
+
+async function runVisualCheck(
+  absolutePath: string,
+  file: string,
+  config: ReturnType<typeof loadConfig>,
+  options: LinterOptions,
+  errors: LintError[],
+  warnings: LintError[]
+): Promise<string | undefined> {
+  try {
+    const visualResult = await runVisualRules(absolutePath, config);
+    errors.push(...visualResult.errors);
+    warnings.push(...visualResult.warnings);
+    return undefined;
+  } catch (error) {
+    const visualError = error instanceof Error ? error.message : String(error);
+    if (options.format === 'text') {
+      console.warn(chalk.yellow(`  ⚠️  Visual check failed for ${basename(file)}: ${visualError}`));
+    }
+    return visualError;
+  }
+}
+
+function applyFixesIfNeeded(
+  content: string,
+  absolutePath: string,
+  errors: LintError[],
+  warnings: LintError[],
+  options: LinterOptions
+): { content: string; fixes: FixResult[]; fixedCount: number } {
+  if (!options.fix && !options.fixDryRun) {
+    return { content, fixes: [], fixedCount: 0 };
   }
 
-  // Load config
-  const config = loadConfig(options.config);
-
-  // Determine which rules to run
-  const runStatic = !options.visual || options.static;
-  const runVisual = options.visual || (!options.static && !options.visual);
-
-  const results: LintResult[] = [];
-  let totalFixed = 0;
-
-  if (options.format === 'text') {
-    console.log(chalk.cyan.bold('\n🔍 marplint - Marp Slide Linter\n'));
-    console.log(chalk.blue(`Scanning ${files.length} file(s)...\n`));
-
-    if (options.fix) {
-      console.log(chalk.magenta(`Auto-fix enabled. Fixable rules: ${getFixableRules().join(', ')}\n`));
-    }
+  const { fixedContent, results: fixResults } = applyFixes(content, [...errors, ...warnings]);
+  if (fixResults.length === 0) {
+    return { content, fixes: [], fixedCount: 0 };
   }
 
-  for (const file of files) {
-    const absolutePath = resolve(file);
+  const fixedCount = fixResults.filter((f) => f.applied).length;
+  if (options.fix && !options.fixDryRun) {
+    writeFileSync(absolutePath, fixedContent, 'utf-8');
+  }
 
-    if (!existsSync(absolutePath)) {
-      console.error(chalk.red(`File not found: ${file}`));
-      continue;
-    }
+  return { content: options.fix ? fixedContent : content, fixes: fixResults, fixedCount };
+}
 
-    let content = readFileSync(absolutePath, 'utf-8');
-    const errors: LintError[] = [];
-    const warnings: LintError[] = [];
-    let fixes: FixResult[] = [];
-    let visualError: string | undefined;
+async function processFile(
+  file: string,
+  config: ReturnType<typeof loadConfig>,
+  options: LinterOptions,
+  runStatic: boolean,
+  runVisual: boolean
+): Promise<{ result: LintResult; fixedCount: number }> {
+  const absolutePath = resolve(file);
+  let content = readFileSync(absolutePath, 'utf-8');
+  const errors: LintError[] = [];
+  const warnings: LintError[] = [];
 
-    // Run static rules
-    if (runStatic) {
-      const staticResult = runStaticRules(content, file, config);
-      errors.push(...staticResult.errors);
-      warnings.push(...staticResult.warnings);
-    }
+  if (runStatic) {
+    const staticResult = runStaticRules(content, file, config);
+    errors.push(...staticResult.errors);
+    warnings.push(...staticResult.warnings);
+  }
 
-    // Run visual rules
-    if (runVisual && !options.static) {
-      try {
-        const visualResult = await runVisualRules(absolutePath, config);
-        errors.push(...visualResult.errors);
-        warnings.push(...visualResult.warnings);
-      } catch (error) {
-        visualError = error instanceof Error ? error.message : String(error);
-        if (options.format === 'text') {
-          console.warn(chalk.yellow(`  ⚠️  Visual check failed for ${basename(file)}: ${visualError}`));
-        }
-      }
-    }
+  const visualError =
+    runVisual && !options.static
+      ? await runVisualCheck(absolutePath, file, config, options, errors, warnings)
+      : undefined;
 
-    // Apply fixes if requested
-    if (options.fix || options.fixDryRun) {
-      const allIssues = [...errors, ...warnings];
-      const { fixedContent, results: fixResults } = applyFixes(content, allIssues);
+  const fixResult = applyFixesIfNeeded(content, absolutePath, errors, warnings, options);
+  content = fixResult.content;
 
-      if (fixResults.length > 0) {
-        fixes = fixResults;
-        totalFixed += fixResults.filter((f) => f.applied).length;
+  const filteredErrors = options.rule ? errors.filter((e) => e.ruleId === options.rule) : errors;
+  const filteredWarnings = options.rule ? warnings.filter((w) => w.ruleId === options.rule) : warnings;
+  const slideCount = (content.match(/\n---\n/g) || []).length + 1;
 
-        if (options.fix && !options.fixDryRun) {
-          writeFileSync(absolutePath, fixedContent, 'utf-8');
-          content = fixedContent; // Update for re-check
-        }
-      }
-    }
-
-    // Filter by specific rule if specified
-    let filteredErrors = errors;
-    let filteredWarnings = warnings;
-    if (options.rule) {
-      filteredErrors = errors.filter((e) => e.ruleId === options.rule);
-      filteredWarnings = warnings.filter((w) => w.ruleId === options.rule);
-    }
-
-    // Count slides
-    const slideCount = (content.match(/\n---\n/g) || []).length + 1;
-
-    results.push({
+  return {
+    result: {
       file,
       slideCount,
       errors: filteredErrors,
       warnings: filteredWarnings,
-      fixes: fixes.length > 0 ? fixes : undefined,
+      fixes: fixResult.fixes.length > 0 ? fixResult.fixes : undefined,
       visualError
-    });
+    },
+    fixedCount: fixResult.fixedCount
+  };
+}
 
-    // Output progress for text format
-    if (options.format === 'text') {
-      outputFileResult(file, slideCount, filteredErrors, filteredWarnings, fixes, options.fixDryRun);
-    }
-  }
-
-  // Output summary
-  const output = formatOutput(results, totalFixed);
-
+function outputResults(output: FormattedOutput, options: LinterOptions): void {
   if (options.format === 'json') {
     console.log(JSON.stringify(output, null, 2));
   } else if (options.format === 'html') {
@@ -211,8 +205,45 @@ async function runLinter(
   } else {
     outputSummary(output.summary, options.fix, options.fixDryRun);
   }
+}
 
-  // Exit with error code if there are errors (after fixes)
+async function runLinter(filePatterns: string[], options: LinterOptions) {
+  const files = await expandGlobPatterns(filePatterns);
+
+  if (files.length === 0) {
+    console.error(chalk.yellow('No files found matching the patterns'));
+    process.exit(1);
+  }
+
+  const config = loadConfig(options.config);
+  const runStatic = !options.visual || !!options.static;
+  const runVisual = !!options.visual || (!options.static && !options.visual);
+
+  if (options.format === 'text') {
+    printLinterHeader(files.length, options.fix);
+  }
+
+  const results: LintResult[] = [];
+  let totalFixed = 0;
+
+  for (const file of files) {
+    if (!existsSync(resolve(file))) {
+      console.error(chalk.red(`File not found: ${file}`));
+      continue;
+    }
+
+    const { result, fixedCount } = await processFile(file, config, options, runStatic, runVisual);
+    results.push(result);
+    totalFixed += fixedCount;
+
+    if (options.format === 'text') {
+      outputFileResult(file, result.slideCount, result.errors, result.warnings, result.fixes ?? [], options.fixDryRun);
+    }
+  }
+
+  const output = formatOutput(results, totalFixed);
+  outputResults(output, options);
+
   if (output.summary.errors > 0) {
     process.exit(1);
   }

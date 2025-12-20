@@ -151,50 +151,60 @@ function findSimilarRules(input: string): string[] {
   }).slice(0, 3);
 }
 
+/** Find config file path in directory tree */
+function findConfigFile(searchDir: string): string | null {
+  let currentDir = searchDir;
+  while (currentDir !== dirname(currentDir)) {
+    for (const filename of CONFIG_FILENAMES) {
+      const configPath = join(currentDir, filename);
+      if (existsSync(configPath)) return configPath;
+    }
+    currentDir = dirname(currentDir);
+  }
+  return null;
+}
+
+/** Parse and validate config file */
+function parseConfigFile(configPath: string): MarplintConfigParsed | null {
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+    const rawConfig = JSON.parse(content) as unknown;
+    const parseResult = configSchema.safeParse(rawConfig);
+
+    if (!parseResult.success) {
+      console.warn(`[marplint] Invalid config in ${configPath}:`);
+      for (const issue of parseResult.error.issues) {
+        console.warn(`  - ${issue.path.join('.')}: ${issue.message}`);
+      }
+      return null;
+    }
+
+    if (parseResult.data.rules) {
+      validateRuleNames(parseResult.data.rules, configPath);
+    }
+
+    return parseResult.data;
+  } catch (error) {
+    console.warn(
+      `[marplint] Failed to parse config file ${configPath}: ${error instanceof Error ? error.message : error}`
+    );
+    return null;
+  }
+}
+
 /**
  * Find and load configuration file
  */
 export function loadConfig(startDir?: string): MarplintConfig {
   const searchDir = startDir ?? process.cwd();
+  const configPath = findConfigFile(searchDir);
 
-  // Search for config file
-  let currentDir = searchDir;
-  while (currentDir !== dirname(currentDir)) {
-    for (const filename of CONFIG_FILENAMES) {
-      const configPath = join(currentDir, filename);
-      if (existsSync(configPath)) {
-        try {
-          const content = readFileSync(configPath, 'utf-8');
-          const rawConfig = JSON.parse(content) as unknown;
+  if (!configPath) return DEFAULT_CONFIG;
 
-          // Validate with zod schema
-          const parseResult = configSchema.safeParse(rawConfig);
+  const parsedConfig = parseConfigFile(configPath);
+  if (!parsedConfig) return DEFAULT_CONFIG;
 
-          if (!parseResult.success) {
-            console.warn(`[marplint] Invalid config in ${configPath}:`);
-            for (const issue of parseResult.error.issues) {
-              console.warn(`  - ${issue.path.join('.')}: ${issue.message}`);
-            }
-            return DEFAULT_CONFIG;
-          }
-
-          // Warn about unknown rules
-          if (parseResult.data.rules) {
-            validateRuleNames(parseResult.data.rules, configPath);
-          }
-
-          return mergeConfig(DEFAULT_CONFIG, parseResult.data as Partial<MarplintConfig>);
-        } catch (error) {
-          console.warn(
-            `[marplint] Failed to parse config file ${configPath}: ${error instanceof Error ? error.message : error}`
-          );
-        }
-      }
-    }
-    currentDir = dirname(currentDir);
-  }
-
-  return DEFAULT_CONFIG;
+  return mergeConfig(DEFAULT_CONFIG, parsedConfig as Partial<MarplintConfig>);
 }
 
 /**

@@ -32,84 +32,54 @@ interface Link {
   isImage: boolean;
 }
 
+/** Extract matches using regex pattern */
+function extractMatches(
+  pattern: RegExp,
+  line: string,
+  context: LineContext,
+  isImage: boolean,
+  skipImagePrefix = false
+): Link[] {
+  const links: Link[] = [];
+  let match;
+  while ((match = pattern.exec(line)) !== null) {
+    if (skipImagePrefix && match.index > 0 && line[match.index - 1] === '!') continue;
+    links.push({
+      url: match[2] ?? match[1] ?? '',
+      text: match[1] ?? '',
+      lineNumber: context.lineNumber,
+      slideNumber: context.slideNumber,
+      isImage
+    });
+  }
+  pattern.lastIndex = 0;
+  return links;
+}
+
+/** Extract all links from a line */
+function extractLinksFromLine(line: string, context: LineContext, checkImages: boolean): Link[] {
+  const links: Link[] = [];
+
+  if (checkImages) {
+    links.push(...extractMatches(/!\[([^\]]*)\]\(([^)]+)\)/g, line, context, true));
+    links.push(...extractMatches(/<img[^>]+src=["']([^"']+)["'][^>]*>/g, line, context, true));
+  }
+
+  links.push(...extractMatches(/\[([^\]]*)\]\(([^)]+)\)/g, line, context, false, true));
+  links.push(...extractMatches(/<a[^>]+href=["']([^"']+)["'][^>]*>/g, line, context, false));
+
+  return links;
+}
+
 export function linkValidity(content: string, filePath: string, config: LinkValidityConfig = {}): LintError[] {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-
-  if (!mergedConfig.enabled) {
-    return [];
-  }
+  if (!mergedConfig.enabled) return [];
 
   const errors: LintError[] = [];
 
-  // Regex patterns for links and images
-  const linkPattern = /\[([^\]]*)\]\(([^)]+)\)/g;
-  const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  const htmlImgPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
-  const htmlLinkPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>/g;
-
   visitSlides(content, {
     onLine(line: string, context: LineContext) {
-      const links: Link[] = [];
-
-      // Markdown images
-      if (mergedConfig.checkImages) {
-        let match;
-        while ((match = imagePattern.exec(line)) !== null) {
-          links.push({
-            url: match[2] ?? '',
-            text: match[1] ?? '',
-            lineNumber: context.lineNumber,
-            slideNumber: context.slideNumber,
-            isImage: true
-          });
-        }
-        imagePattern.lastIndex = 0; // Reset regex state
-      }
-
-      // Markdown links
-      let match;
-      while ((match = linkPattern.exec(line)) !== null) {
-        // Skip if it's actually an image (starts with !)
-        const startIndex = match.index;
-        if (startIndex > 0 && line[startIndex - 1] === '!') continue;
-
-        links.push({
-          url: match[2] ?? '',
-          text: match[1] ?? '',
-          lineNumber: context.lineNumber,
-          slideNumber: context.slideNumber,
-          isImage: false
-        });
-      }
-      linkPattern.lastIndex = 0; // Reset regex state
-
-      // HTML images
-      if (mergedConfig.checkImages) {
-        while ((match = htmlImgPattern.exec(line)) !== null) {
-          links.push({
-            url: match[1] ?? '',
-            text: '',
-            lineNumber: context.lineNumber,
-            slideNumber: context.slideNumber,
-            isImage: true
-          });
-        }
-        htmlImgPattern.lastIndex = 0; // Reset regex state
-      }
-
-      // HTML links
-      while ((match = htmlLinkPattern.exec(line)) !== null) {
-        links.push({
-          url: match[1] ?? '',
-          text: '',
-          lineNumber: context.lineNumber,
-          slideNumber: context.slideNumber,
-          isImage: false
-        });
-      }
-      htmlLinkPattern.lastIndex = 0; // Reset regex state
-
-      // Validate each link
+      const links = extractLinksFromLine(line, context, mergedConfig.checkImages);
       for (const link of links) {
         validateLink(link, filePath, errors, mergedConfig);
       }

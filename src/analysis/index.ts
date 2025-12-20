@@ -188,30 +188,20 @@ function estimateReadingTime(slide: ReturnType<typeof parseSlides>['slides'][0])
   };
 }
 
-/**
- * Check accessibility issues
- * Uses shared validation functions from accessibility-checks.ts
- */
-function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]): AccessibilityScore {
-  const content = slide.lines.join('\n');
-  const issues: AccessibilityIssue[] = [];
-  const passedChecks: string[] = [];
-
-  // Check 1: Images have alt text (using shared function)
+/** Check image alt text accessibility */
+function checkImagesAccessibility(content: string, issues: AccessibilityIssue[], passedChecks: string[]): void {
   const images = extractImages(content);
   const altIssues = checkImageAltText(images);
   for (const _issue of altIssues) {
-    issues.push({
-      type: 'image-alt',
-      message: 'Image missing alt text',
-      severity: 'serious'
-    });
+    issues.push({ type: 'image-alt', message: 'Image missing alt text', severity: 'serious' });
   }
   if (images.length > 0 && altIssues.length === 0) {
     passedChecks.push('All images have alt text');
   }
+}
 
-  // Check 2: Proper heading hierarchy (using shared function)
+/** Check heading hierarchy accessibility */
+function checkHeadingsAccessibility(content: string, issues: AccessibilityIssue[], passedChecks: string[]): void {
   const headings = extractHeadings(content);
   const hierarchyIssues = checkHeadingHierarchy(headings);
   for (const issue of hierarchyIssues) {
@@ -224,8 +214,10 @@ function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]):
   if (headings.length > 0 && hierarchyIssues.length === 0) {
     passedChecks.push('Proper heading hierarchy');
   }
+}
 
-  // Check 3: Links have descriptive text (using shared function)
+/** Check link text quality */
+function checkLinksAccessibility(content: string, issues: AccessibilityIssue[], passedChecks: string[]): void {
   const links = extractLinks(content);
   const linkIssues = checkLinkTextQuality(links);
   for (const issue of linkIssues) {
@@ -238,23 +230,42 @@ function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]):
   if (links.length > 0 && linkIssues.length === 0) {
     passedChecks.push('Links have descriptive text');
   }
+}
 
-  // Check 4: Table has header (using shared function)
+/** Check table headers */
+function checkTablesAccessibility(content: string, issues: AccessibilityIssue[], passedChecks: string[]): void {
   const hasTables = content.match(/^\|[^|]+\|/gm) || [];
-  if (hasTables.length > 0) {
-    if (!hasTableHeader(content)) {
-      issues.push({
-        type: 'table-header',
-        message: 'Table may be missing header row',
-        severity: 'moderate'
-      });
-    } else {
-      passedChecks.push('Tables have headers');
-    }
-  }
+  if (hasTables.length === 0) return;
 
-  // Check 5: Color contrast (basic check - just look for explicit colors)
-  // This is a simplified check; real contrast checking is done in visual rules
+  if (!hasTableHeader(content)) {
+    issues.push({ type: 'table-header', message: 'Table may be missing header row', severity: 'moderate' });
+  } else {
+    passedChecks.push('Tables have headers');
+  }
+}
+
+/** Calculate accessibility score from issues */
+function calculateAccessibilityScore(issues: AccessibilityIssue[]): number {
+  const severityPenalty = { critical: 30, serious: 20, moderate: 10, minor: 5 };
+  const penalty = issues.reduce((sum, issue) => sum + severityPenalty[issue.severity], 0);
+  return Math.max(0, 100 - penalty);
+}
+
+/**
+ * Check accessibility issues
+ * Uses shared validation functions from accessibility-checks.ts
+ */
+function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]): AccessibilityScore {
+  const content = slide.lines.join('\n');
+  const issues: AccessibilityIssue[] = [];
+  const passedChecks: string[] = [];
+
+  checkImagesAccessibility(content, issues, passedChecks);
+  checkHeadingsAccessibility(content, issues, passedChecks);
+  checkLinksAccessibility(content, issues, passedChecks);
+  checkTablesAccessibility(content, issues, passedChecks);
+
+  // Check for custom colors
   if (content.includes('color:') || content.includes('background:')) {
     issues.push({
       type: 'color-check',
@@ -263,23 +274,7 @@ function checkAccessibility(slide: ReturnType<typeof parseSlides>['slides'][0]):
     });
   }
 
-  // Calculate score
-  const maxScore = 100;
-  const severityPenalty = {
-    critical: 30,
-    serious: 20,
-    moderate: 10,
-    minor: 5
-  };
-
-  let penalty = 0;
-  for (const issue of issues) {
-    penalty += severityPenalty[issue.severity];
-  }
-
-  const score = Math.max(0, maxScore - penalty);
-
-  return { score, issues, passedChecks };
+  return { score: calculateAccessibilityScore(issues), issues, passedChecks };
 }
 
 /**

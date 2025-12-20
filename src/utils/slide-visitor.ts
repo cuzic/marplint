@@ -50,151 +50,170 @@ export interface SlideVisitor {
   onFrontmatter?(content: string): void;
 }
 
+/** Internal state for slide visitor */
+interface VisitorState {
+  currentSlide: number;
+  slideStartLine: number;
+  inFrontmatter: boolean;
+  frontmatterContent: string[];
+  inCodeBlock: boolean;
+  codeBlockStartLine: number;
+  codeBlockLanguage: string;
+  codeBlockLines: string[];
+  slideHasStarted: boolean;
+}
+
+function createInitialState(): VisitorState {
+  return {
+    currentSlide: 1,
+    slideStartLine: 1,
+    inFrontmatter: false,
+    frontmatterContent: [],
+    inCodeBlock: false,
+    codeBlockStartLine: 0,
+    codeBlockLanguage: '',
+    codeBlockLines: [],
+    slideHasStarted: false
+  };
+}
+
+function getContext(state: VisitorState, lineNumber: number): LineContext {
+  return {
+    slideNumber: state.currentSlide,
+    lineNumber,
+    inFrontmatter: state.inFrontmatter,
+    inCodeBlock: state.inCodeBlock,
+    codeBlockLanguage: state.codeBlockLanguage,
+    codeBlockStartLine: state.codeBlockStartLine
+  };
+}
+
+/** Handle --- separator (frontmatter or slide break) */
+function handleSeparator(state: VisitorState, lineIndex: number, lineNumber: number, visitor: SlideVisitor): boolean {
+  if (lineIndex === 0) {
+    state.inFrontmatter = true;
+    return true;
+  }
+  if (state.inFrontmatter) {
+    state.inFrontmatter = false;
+    visitor.onFrontmatter?.(state.frontmatterContent.join('\n'));
+    state.frontmatterContent = [];
+    if (!state.slideHasStarted) {
+      visitor.onSlideStart?.(state.currentSlide, lineNumber + 1);
+      state.slideHasStarted = true;
+    }
+    return true;
+  }
+  // Slide break
+  visitor.onSlideEnd?.(state.currentSlide, lineNumber - 1);
+  state.currentSlide++;
+  state.slideStartLine = lineNumber + 1;
+  visitor.onSlideStart?.(state.currentSlide, state.slideStartLine);
+  return true;
+}
+
+/** Handle code block delimiter */
+function handleCodeBlockDelimiter(
+  state: VisitorState,
+  match: RegExpMatchArray,
+  lineNumber: number,
+  visitor: SlideVisitor
+): void {
+  if (!state.inCodeBlock) {
+    state.inCodeBlock = true;
+    state.codeBlockStartLine = lineNumber;
+    state.codeBlockLanguage = match[2] ?? '';
+    state.codeBlockLines = [];
+    visitor.onCodeBlockStart?.(state.codeBlockLanguage, getContext(state, lineNumber));
+  } else {
+    visitor.onCodeBlockEnd?.(
+      state.codeBlockLines,
+      state.codeBlockLanguage,
+      state.codeBlockStartLine,
+      getContext(state, lineNumber)
+    );
+    state.inCodeBlock = false;
+    state.codeBlockLanguage = '';
+    state.codeBlockLines = [];
+  }
+}
+
+/** Detect and handle heading */
+function detectHeading(line: string, context: LineContext, visitor: SlideVisitor): void {
+  const match = line.match(/^(#{1,6})\s+(.+)$/);
+  if (match) {
+    visitor.onHeading?.(match[1]?.length ?? 0, match[2] ?? '', context);
+  }
+}
+
+/** Detect and handle list item */
+function detectListItem(line: string, context: LineContext, visitor: SlideVisitor): void {
+  const match = line.match(/^(\s*)([*\-+]|\d+\.)\s+(.+)$/);
+  if (match) {
+    const indent = match[1]?.length ?? 0;
+    const depth = Math.floor(indent / 2) + 1;
+    const marker = match[2] ?? '';
+    visitor.onListItem?.(match[3] ?? '', depth, /^\d+\./.test(marker), context);
+  }
+}
+
+/** Ensure slide has started */
+function ensureSlideStarted(state: VisitorState, visitor: SlideVisitor): void {
+  if (state.slideHasStarted) return;
+  visitor.onSlideStart?.(state.currentSlide, 1);
+  state.slideHasStarted = true;
+}
+
+/** Handle code block content */
+function handleCodeBlockContent(state: VisitorState, line: string, lineNumber: number, visitor: SlideVisitor): void {
+  state.codeBlockLines.push(line);
+  visitor.onCodeBlockLine?.(line, getContext(state, lineNumber));
+}
+
+/** Process regular line content */
+function processLineContent(line: string, context: LineContext, visitor: SlideVisitor): void {
+  visitor.onLine?.(line, context);
+  if (visitor.onHeading) detectHeading(line, context, visitor);
+  if (visitor.onListItem) detectListItem(line, context, visitor);
+}
+
 /**
  * Visit slides in markdown content
  * Handles frontmatter, code blocks, and slide separators
  */
 export function visitSlides(content: string, visitor: SlideVisitor): void {
   const lines = content.split('\n');
-
-  let currentSlide = 1;
-  let slideStartLine = 1;
-  let inFrontmatter = false;
-  let frontmatterContent: string[] = [];
-  let inCodeBlock = false;
-  let codeBlockStartLine = 0;
-  let codeBlockLanguage = '';
-  let codeBlockLines: string[] = [];
-  let slideHasStarted = false;
-
-  const getContext = (lineNumber: number): LineContext => ({
-    slideNumber: currentSlide,
-    lineNumber,
-    inFrontmatter,
-    inCodeBlock,
-    codeBlockLanguage,
-    codeBlockStartLine
-  });
+  const state = createInitialState();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
     const lineNumber = i + 1;
 
-    // Track frontmatter
-    if (line.trim() === '---') {
-      if (i === 0) {
-        inFrontmatter = true;
-        continue;
-      } else if (inFrontmatter) {
-        inFrontmatter = false;
-        if (visitor.onFrontmatter) {
-          visitor.onFrontmatter(frontmatterContent.join('\n'));
-        }
-        frontmatterContent = [];
-        // Start first slide after frontmatter
-        if (!slideHasStarted && visitor.onSlideStart) {
-          visitor.onSlideStart(currentSlide, lineNumber + 1);
-          slideHasStarted = true;
-        }
-        continue;
-      } else {
-        // Slide break
-        if (visitor.onSlideEnd) {
-          visitor.onSlideEnd(currentSlide, lineNumber - 1);
-        }
-        currentSlide++;
-        slideStartLine = lineNumber + 1;
-
-        if (visitor.onSlideStart) {
-          visitor.onSlideStart(currentSlide, slideStartLine);
-        }
-        continue;
-      }
-    }
-
-    // Collect frontmatter content
-    if (inFrontmatter) {
-      frontmatterContent.push(line);
+    if (line.trim() === '---' && handleSeparator(state, i, lineNumber, visitor)) continue;
+    if (state.inFrontmatter) {
+      state.frontmatterContent.push(line);
       continue;
     }
 
-    // Start first slide if no frontmatter
-    if (!slideHasStarted) {
-      if (visitor.onSlideStart) {
-        visitor.onSlideStart(currentSlide, 1);
-      }
-      slideHasStarted = true;
-    }
+    ensureSlideStarted(state, visitor);
 
-    const context = getContext(lineNumber);
+    const context = getContext(state, lineNumber);
+    visitor.onLineRaw?.(line, context);
 
-    // Call raw line handler (includes code block content)
-    if (visitor.onLineRaw) {
-      visitor.onLineRaw(line, context);
-    }
-
-    // Track code blocks
     const codeBlockMatch = line.match(/^(`{3,})(\w*)/);
     if (codeBlockMatch) {
-      if (!inCodeBlock) {
-        // Start of code block
-        inCodeBlock = true;
-        codeBlockStartLine = lineNumber;
-        codeBlockLanguage = codeBlockMatch[2] ?? '';
-        codeBlockLines = [];
-
-        if (visitor.onCodeBlockStart) {
-          visitor.onCodeBlockStart(codeBlockLanguage, getContext(lineNumber));
-        }
-      } else {
-        // End of code block
-        if (visitor.onCodeBlockEnd) {
-          visitor.onCodeBlockEnd(codeBlockLines, codeBlockLanguage, codeBlockStartLine, getContext(lineNumber));
-        }
-        inCodeBlock = false;
-        codeBlockLanguage = '';
-        codeBlockLines = [];
-      }
+      handleCodeBlockDelimiter(state, codeBlockMatch, lineNumber, visitor);
+      continue;
+    }
+    if (state.inCodeBlock) {
+      handleCodeBlockContent(state, line, lineNumber, visitor);
       continue;
     }
 
-    if (inCodeBlock) {
-      codeBlockLines.push(line);
-      if (visitor.onCodeBlockLine) {
-        visitor.onCodeBlockLine(line, getContext(lineNumber));
-      }
-      continue;
-    }
-
-    // Call line handler (outside code blocks)
-    if (visitor.onLine) {
-      visitor.onLine(line, context);
-    }
-
-    // Detect headings
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch && visitor.onHeading) {
-      const level = headingMatch[1]?.length ?? 0;
-      const text = headingMatch[2] ?? '';
-      visitor.onHeading(level, text, context);
-    }
-
-    // Detect list items
-    const listMatch = line.match(/^(\s*)([*\-+]|\d+\.)\s+(.+)$/);
-    if (listMatch && visitor.onListItem) {
-      const indent = listMatch[1]?.length ?? 0;
-      const depth = Math.floor(indent / 2) + 1;
-      const marker = listMatch[2] ?? '';
-      const ordered = /^\d+\./.test(marker);
-      const text = listMatch[3] ?? '';
-      visitor.onListItem(text, depth, ordered, context);
-    }
+    processLineContent(line, context, visitor);
   }
 
-  // Handle last slide
-  if (slideHasStarted && visitor.onSlideEnd) {
-    visitor.onSlideEnd(currentSlide, lines.length);
-  }
+  if (state.slideHasStarted) visitor.onSlideEnd?.(state.currentSlide, lines.length);
 }
 
 /**

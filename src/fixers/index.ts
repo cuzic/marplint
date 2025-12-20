@@ -112,87 +112,103 @@ function fixHtmlBlankLines(
   return { content: lines.join('\n'), results };
 }
 
+/** Find slide start indices */
+function findSlideStarts(lines: string[]): number[] {
+  const starts: number[] = [0];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]?.trim() === '---' && i > 0) {
+      starts.push(i + 1);
+    }
+  }
+  return starts;
+}
+
+/** Determine font class from error message */
+function determineFontClass(message: string): string {
+  if (message.includes('font-xxsmall')) return 'font-xxsmall';
+  if (message.includes('font-xsmall')) return 'font-xsmall';
+  return 'font-small';
+}
+
+/** Find existing _class directive line index */
+function findDirectiveLine(lines: string[], slideStart: number, slideEnd: number): number {
+  for (let i = slideStart; i < slideEnd; i++) {
+    const line = lines[i] ?? '';
+    if (line.trim().startsWith('<!-- _class:')) return i;
+    if (line.trim() && !line.trim().startsWith('<!--') && line.trim() !== '---') break;
+  }
+  return -1;
+}
+
+/** Update existing directive with new class */
+function updateExistingDirective(
+  lines: string[],
+  directiveLine: number,
+  fontClass: string,
+  error: LintError,
+  results: FixResult[]
+): void {
+  const existingLine = lines[directiveLine] ?? '';
+  if (existingLine.includes(fontClass)) return;
+
+  const classMatch = existingLine.match(/_class:\s*([^>]+)/);
+  if (!classMatch) return;
+
+  const existingClasses = classMatch[1]?.trim() ?? '';
+  lines[directiveLine] = `<!-- _class: ${existingClasses} ${fontClass} -->`;
+  results.push({
+    ruleId: 'marp/missing-font-class',
+    slideNumber: error.slideNumber,
+    lineNumber: directiveLine + 1,
+    description: `Added ${fontClass} to existing directive`,
+    applied: true
+  });
+}
+
+/** Insert new directive */
+function insertNewDirective(
+  lines: string[],
+  slideStart: number,
+  fontClass: string,
+  error: LintError,
+  results: FixResult[],
+  slideStarts: number[],
+  slideIndex: number
+): void {
+  lines.splice(slideStart, 0, '', `<!-- _class: ${fontClass} -->`);
+  results.push({
+    ruleId: 'marp/missing-font-class',
+    slideNumber: error.slideNumber,
+    lineNumber: slideStart + 1,
+    description: `Added <!-- _class: ${fontClass} --> directive`,
+    applied: true
+  });
+  for (let j = slideIndex + 1; j < slideStarts.length; j++) {
+    slideStarts[j] = (slideStarts[j] ?? 0) + 2;
+  }
+}
+
 /**
  * Fix: Add font-class directive to dense slides
  */
-function fixMissingFontClass(
-  content: string,
-  errors: LintError[]
-): {
-  content: string;
-  results: FixResult[];
-} {
+function fixMissingFontClass(content: string, errors: LintError[]): { content: string; results: FixResult[] } {
   const lines = content.split('\n');
   const results: FixResult[] = [];
-
-  // Find slide boundaries
-  const slideStarts: number[] = [0];
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i]?.trim() === '---' && i > 0) {
-      slideStarts.push(i + 1);
-    }
-  }
+  const slideStarts = findSlideStarts(lines);
 
   for (const error of errors) {
     const slideIndex = error.slideNumber - 1;
     const slideStart = slideStarts[slideIndex];
     if (slideStart === undefined) continue;
 
-    // Determine which font class to add based on error message
-    let fontClass = 'font-small';
-    if (error.message.includes('font-xxsmall')) {
-      fontClass = 'font-xxsmall';
-    } else if (error.message.includes('font-xsmall')) {
-      fontClass = 'font-xsmall';
-    }
-
-    // Check if there's already a directive comment
-    let directiveLine = -1;
-    for (let i = slideStart; i < (slideStarts[slideIndex + 1] ?? lines.length); i++) {
-      const line = lines[i] ?? '';
-      if (line.trim().startsWith('<!-- _class:')) {
-        directiveLine = i;
-        break;
-      }
-      // Stop at first non-empty, non-comment line
-      if (line.trim() && !line.trim().startsWith('<!--') && line.trim() !== '---') {
-        break;
-      }
-    }
+    const fontClass = determineFontClass(error.message);
+    const slideEnd = slideStarts[slideIndex + 1] ?? lines.length;
+    const directiveLine = findDirectiveLine(lines, slideStart, slideEnd);
 
     if (directiveLine >= 0) {
-      // Update existing directive
-      const existingLine = lines[directiveLine] ?? '';
-      if (!existingLine.includes(fontClass)) {
-        const classMatch = existingLine.match(/_class:\s*([^>]+)/);
-        if (classMatch) {
-          const existingClasses = classMatch[1]?.trim() ?? '';
-          const newClasses = `${existingClasses} ${fontClass}`.trim();
-          lines[directiveLine] = `<!-- _class: ${newClasses} -->`;
-          results.push({
-            ruleId: 'marp/missing-font-class',
-            slideNumber: error.slideNumber,
-            lineNumber: directiveLine + 1,
-            description: `Added ${fontClass} to existing directive`,
-            applied: true
-          });
-        }
-      }
+      updateExistingDirective(lines, directiveLine, fontClass, error, results);
     } else {
-      // Add new directive after slide separator or at start
-      const insertLine = slideStart;
-      lines.splice(insertLine, 0, '', `<!-- _class: ${fontClass} -->`);
-      results.push({
-        ruleId: 'marp/missing-font-class',
-        slideNumber: error.slideNumber,
-        lineNumber: insertLine + 1,
-        description: `Added <!-- _class: ${fontClass} --> directive`,
-        applied: true
-      });
-      // Update subsequent slide starts
-      for (let j = slideIndex + 1; j < slideStarts.length; j++) {
-        slideStarts[j] = (slideStarts[j] ?? 0) + 2;
-      }
+      insertNewDirective(lines, slideStart, fontClass, error, results, slideStarts, slideIndex);
     }
   }
 

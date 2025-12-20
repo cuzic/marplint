@@ -21,53 +21,65 @@ const MARKDOWN_PATTERNS = [
   /^\*\*|^__/ // Bold text at start
 ];
 
-export function htmlBlankLines(content: string, config: HtmlBlankLinesConfig = {}): LintError[] {
-  if (config.enabled === false) {
-    return [];
+/** Check for HTML opening tag followed by Markdown */
+function checkHtmlOpeningTag(
+  trimmed: string,
+  nextLine: string,
+  lineNumber: number,
+  currentSlide: number,
+  errors: LintError[]
+): void {
+  if (!isHtmlOpenTag(trimmed)) return;
+  if (nextLine && isMarkdownContent(nextLine) && !isHtmlTag(nextLine)) {
+    errors.push({
+      ruleId: 'marp/html-blank-lines',
+      slideNumber: currentSlide,
+      lineNumber: lineNumber + 1,
+      message: `Missing blank line after HTML tag "${trimmed.substring(0, 30)}..." before Markdown content`,
+      severity: 'error'
+    });
   }
+}
+
+/** Check for Markdown followed by HTML closing tag */
+function checkMarkdownBeforeClosingTag(
+  trimmed: string,
+  nextLine: string,
+  lineNumber: number,
+  currentSlide: number,
+  errors: LintError[]
+): void {
+  if (!isMarkdownContent(trimmed) || isHtmlTag(trimmed)) return;
+  if (isHtmlCloseTag(nextLine)) {
+    errors.push({
+      ruleId: 'marp/html-blank-lines',
+      slideNumber: currentSlide,
+      lineNumber: lineNumber,
+      message: `Missing blank line before closing HTML tag "${nextLine}" after Markdown content`,
+      severity: 'error'
+    });
+  }
+}
+
+export function htmlBlankLines(content: string, config: HtmlBlankLinesConfig = {}): LintError[] {
+  if (config.enabled === false) return [];
 
   const lines = content.split('\n');
   const errors: LintError[] = [];
   let currentSlide = 1;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const trimmed = line.trim();
+    const trimmed = (lines[i] ?? '').trim();
     const lineNumber = i + 1;
 
-    // Track slide breaks
     if (trimmed === '---' && i > 0) {
       currentSlide++;
       continue;
     }
 
-    // Check for HTML opening tag followed by Markdown
-    if (isHtmlOpenTag(trimmed)) {
-      const nextLine = lines[i + 1]?.trim() ?? '';
-      if (nextLine && isMarkdownContent(nextLine) && !isHtmlTag(nextLine)) {
-        errors.push({
-          ruleId: 'marp/html-blank-lines',
-          slideNumber: currentSlide,
-          lineNumber: lineNumber + 1,
-          message: `Missing blank line after HTML tag "${trimmed.substring(0, 30)}..." before Markdown content`,
-          severity: 'error'
-        });
-      }
-    }
-
-    // Check for Markdown followed by HTML closing tag
-    if (isMarkdownContent(trimmed) && !isHtmlTag(trimmed)) {
-      const nextLine = lines[i + 1]?.trim() ?? '';
-      if (isHtmlCloseTag(nextLine)) {
-        errors.push({
-          ruleId: 'marp/html-blank-lines',
-          slideNumber: currentSlide,
-          lineNumber: lineNumber,
-          message: `Missing blank line before closing HTML tag "${nextLine}" after Markdown content`,
-          severity: 'error'
-        });
-      }
-    }
+    const nextLine = lines[i + 1]?.trim() ?? '';
+    checkHtmlOpeningTag(trimmed, nextLine, lineNumber, currentSlide, errors);
+    checkMarkdownBeforeClosingTag(trimmed, nextLine, lineNumber, currentSlide, errors);
   }
 
   return errors;
