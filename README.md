@@ -1,5 +1,8 @@
 # marplint
 
+[![CI](https://github.com/cuzic/marplint/actions/workflows/ci.yml/badge.svg)](https://github.com/cuzic/marplint/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/cuzic/marplint/graph/badge.svg)](https://codecov.io/gh/cuzic/marplint)
+
 Marpスライド用の高機能linter。オーバーフロー、余白、アクセシビリティなど様々な問題を検出・修正します。
 
 ## 機能一覧
