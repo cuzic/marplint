@@ -4,6 +4,55 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { z } from 'zod';
+
+// Known rule names for validation
+const KNOWN_RULES = [
+  'marp/slide-line-count',
+  'marp/slide-content-density',
+  'marp/html-blank-lines',
+  'marp/missing-font-class',
+  'marp/balanced-columns',
+  'marp/heading-hierarchy',
+  'marp/code-block-length',
+  'marp/link-validity',
+  'marp/japanese-consistency',
+  'marp/slide-title-required',
+  'marp/table-structure',
+  'marp/duplicate-content',
+  'marp/max-nested-list',
+  'marp/overflow',
+  'marp/whitespace',
+  'marp/font-readability',
+  'marp/color-contrast',
+  'marp/element-overlap',
+  'marp/text-truncation'
+] as const;
+
+// Zod schemas for validation
+const ruleConfigSchema = z
+  .union([
+    z.boolean(),
+    z
+      .object({
+        enabled: z.boolean().optional()
+      })
+      .passthrough()
+  ])
+  .optional();
+
+const configSchema = z.object({
+  rules: z.record(z.string(), ruleConfigSchema).optional().default({}),
+  viewport: z
+    .object({
+      width: z.number().positive().optional(),
+      height: z.number().positive().optional()
+    })
+    .optional()
+});
+
+export type MarplintConfigInput = z.input<typeof configSchema>;
+export type MarplintConfigParsed = z.output<typeof configSchema>;
 
 export interface RuleConfig {
   enabled?: boolean;
@@ -76,6 +125,33 @@ const DEFAULT_CONFIG: MarplintConfig = {
 const CONFIG_FILENAMES = ['.marplintrc.json', '.marplintrc', 'marplint.config.json'];
 
 /**
+ * Validate and warn about unknown rule names
+ */
+function validateRuleNames(rules: Record<string, unknown>, configPath: string): void {
+  const unknownRules = Object.keys(rules).filter(
+    (ruleName) => !KNOWN_RULES.includes(ruleName as (typeof KNOWN_RULES)[number])
+  );
+
+  if (unknownRules.length > 0) {
+    console.warn(`[marplint] Unknown rule(s) in ${configPath}:`);
+    for (const rule of unknownRules) {
+      console.warn(`  - "${rule}" (did you mean one of: ${findSimilarRules(rule).join(', ')}?)`);
+    }
+  }
+}
+
+/**
+ * Find similar rule names for suggestions
+ */
+function findSimilarRules(input: string): string[] {
+  const inputLower = input.toLowerCase();
+  return KNOWN_RULES.filter((rule) => {
+    const ruleLower = rule.toLowerCase();
+    return ruleLower.includes(inputLower.replace('marp/', '')) || inputLower.includes(ruleLower.replace('marp/', ''));
+  }).slice(0, 3);
+}
+
+/**
  * Find and load configuration file
  */
 export function loadConfig(startDir?: string): MarplintConfig {
@@ -89,10 +165,29 @@ export function loadConfig(startDir?: string): MarplintConfig {
       if (existsSync(configPath)) {
         try {
           const content = readFileSync(configPath, 'utf-8');
-          const userConfig = JSON.parse(content) as Partial<MarplintConfig>;
-          return mergeConfig(DEFAULT_CONFIG, userConfig);
-        } catch {
-          console.warn(`Failed to parse config file: ${configPath}`);
+          const rawConfig = JSON.parse(content) as unknown;
+
+          // Validate with zod schema
+          const parseResult = configSchema.safeParse(rawConfig);
+
+          if (!parseResult.success) {
+            console.warn(`[marplint] Invalid config in ${configPath}:`);
+            for (const issue of parseResult.error.issues) {
+              console.warn(`  - ${issue.path.join('.')}: ${issue.message}`);
+            }
+            return DEFAULT_CONFIG;
+          }
+
+          // Warn about unknown rules
+          if (parseResult.data.rules) {
+            validateRuleNames(parseResult.data.rules, configPath);
+          }
+
+          return mergeConfig(DEFAULT_CONFIG, parseResult.data as Partial<MarplintConfig>);
+        } catch (error) {
+          console.warn(
+            `[marplint] Failed to parse config file ${configPath}: ${error instanceof Error ? error.message : error}`
+          );
         }
       }
     }
